@@ -8,7 +8,7 @@ Regras completas e planejamento em [PROJETO.md](PROJETO.md).
 
 ## Estrutura
 - `engine/` — motor de regras (TypeScript puro)
-- `server/` — Express + Socket.IO + SQLite (cadastro, salas, ranking)
+- `server/` — Express + Socket.IO + MongoDB (ou SQLite local) — cadastro, salas, ranking
 - `client/` — telas em React + Vite
 
 ## Rodando
@@ -23,5 +23,5 @@ npm run dev:client   # terminal 2 → http://localhost:5173
 Produção:
 ```bash
 npm install && npm run build
-npm start            # usa PORT e DB_PATH, se definidos
+npm start            # usa PORT, MONGODB_URI e MONGODB_DB (sem MONGODB_URI usa SQLite)
 ```
