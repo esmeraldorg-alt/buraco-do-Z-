@@ -369,7 +369,15 @@ export interface VisaoJogador {
   lixo: Carta[];
   cartasNoMonte: number;
   mortoDisponivel: boolean[];
-  equipes: { pontos: number; jogos: Carta[][]; pegouMorto: boolean; vulneravel: boolean }[];
+  equipes: {
+    pontos: number;
+    jogos: Carta[][];
+    pegouMorto: boolean;
+    vulneravel: boolean;
+    /** Pontos que a equipe já tem na mesa nesta rodada (cartas + canastras), em tempo real */
+    rodadaMesa: number;
+    rodadaCanastras: number;
+  }[];
   vez: number;
   fase: Fase;
   rodada: number;
@@ -386,12 +394,18 @@ export function visaoDoJogador(estado: Estado, jogador: number): VisaoJogador {
     lixo: structuredClone(estado.lixo),
     cartasNoMonte: estado.monte.length,
     mortoDisponivel: estado.mortos.map((m) => m !== null),
-    equipes: estado.equipes.map((e, i) => ({
-      pontos: e.pontos,
-      jogos: structuredClone(e.jogos),
-      pegouMorto: e.pegouMorto,
-      vulneravel: estaVulneravel(estado, i),
-    })),
+    equipes: estado.equipes.map((e, i) => {
+      // Depois que a rodada fecha, os pontos já foram somados ao total — não conta duas vezes
+      const emJogo = estado.fase === 'comprar' || estado.fase === 'jogar';
+      return {
+        pontos: e.pontos,
+        jogos: structuredClone(e.jogos),
+        pegouMorto: e.pegouMorto,
+        vulneravel: estaVulneravel(estado, i),
+        rodadaMesa: emJogo ? e.jogos.reduce((s, j) => s + somaPontos(j), 0) : 0,
+        rodadaCanastras: emJogo ? e.jogos.reduce((s, j) => s + pontosBonusJogo(j), 0) : 0,
+      };
+    }),
     vez: estado.vez,
     fase: estado.fase,
     rodada: estado.rodada,

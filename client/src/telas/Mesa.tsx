@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { analisarJogo, type Carta as TCarta, type VisaoJogador } from '@buraco-do-ze/engine';
 import type { Usuario } from '../api';
 import type { Resposta, VisaoSala } from '../conexao';
-import { Carta, VersoCarta, ordenarMao } from '../Carta';
+import { Carta, NOME_ORDEM, VersoCarta, ordenarMao, type OrdemMao } from '../Carta';
 
 interface Props {
   sala: VisaoSala;
@@ -41,7 +41,24 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
   const [ocupado, setOcupado] = useState(false);
   const [verLixo, setVerLixo] = useState(false);
 
-  const mao = useMemo(() => ordenarMao(jogo.minhaMao), [jogo.minhaMao]);
+  const [ordem, setOrdem] = useState<OrdemMao>(() => {
+    try {
+      const o = localStorage.getItem('buraco-do-ze:ordem');
+      return o === 'numero' || o === 'chegada' ? o : 'naipe';
+    } catch {
+      return 'naipe';
+    }
+  });
+  function trocarOrdem() {
+    const proxima: OrdemMao = ordem === 'naipe' ? 'numero' : ordem === 'numero' ? 'chegada' : 'naipe';
+    setOrdem(proxima);
+    try {
+      localStorage.setItem('buraco-do-ze:ordem', proxima);
+    } catch {
+      /* sem armazenamento */
+    }
+  }
+  const mao = useMemo(() => ordenarMao(jogo.minhaMao, ordem), [jogo.minhaMao, ordem]);
   const selecionadas = mao.filter((c) => sel.includes(c.id));
 
   // Limpa a seleção de cartas que saíram da mão
@@ -106,6 +123,11 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
             <span className="placar-nome">{nomeEquipe(eq)}</span>
             {n === 4 && <span className="placar-desc">{descEquipe(eq)}</span>}
             <span className="placar-pontos">{jogo.equipes[eq].pontos}</span>
+            {(jogo.equipes[eq].rodadaMesa > 0 || jogo.equipes[eq].rodadaCanastras > 0) && (
+              <span className="placar-rodada" title="Pontos na mesa nesta rodada (cartas + canastras)">
+                +{jogo.equipes[eq].rodadaMesa + jogo.equipes[eq].rodadaCanastras} na mesa
+              </span>
+            )}
             {jogo.equipes[eq].vulneravel && <span className="selo selo-vulneravel">Vulnerável</span>}
           </div>
         ))}
@@ -191,6 +213,13 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
       />
 
       <div className={`dica ${minhaVez ? 'minha-vez' : ''}`}>{dica}</div>
+
+      <div className="mao-topo">
+        <span className="sutil">Sua mão · {mao.length} cartas</span>
+        <button className="link link-ordem" onClick={trocarOrdem} title="Mudar a ordem das cartas">
+          ↕ {NOME_ORDEM[ordem]}
+        </button>
+      </div>
 
       <div className="mao" role="group" aria-label="Sua mão">
         {mao.map((c) => (

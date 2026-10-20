@@ -4,8 +4,23 @@ import { SIMBOLO_NAIPE, nomeValor } from '@buraco-do-ze/engine';
 
 const ORDEM_NAIPE = { P: 0, C: 1, E: 2, O: 3 } as const;
 
-/** Ordena a mão por naipe (♣ ♥ ♠ ♦, alternando cores) e depois por valor */
-export function ordenarMao(cartas: TCarta[]): TCarta[] {
+export type OrdemMao = 'naipe' | 'numero' | 'chegada';
+
+export const NOME_ORDEM: Record<OrdemMao, string> = {
+  naipe: 'Por naipe',
+  numero: 'Por número',
+  chegada: 'Como veio',
+};
+
+/**
+ * Organiza a mão:
+ * - naipe: junta o mesmo naipe (♣ ♥ ♠ ♦) e ordena pelo número — bom para ver sequências
+ * - numero: ordena pelo número, misturando os naipes
+ * - chegada: na ordem em que as cartas chegaram, sem organizar
+ */
+export function ordenarMao(cartas: TCarta[], ordem: OrdemMao = 'naipe'): TCarta[] {
+  if (ordem === 'chegada') return [...cartas];
+  if (ordem === 'numero') return [...cartas].sort((a, b) => a.valor - b.valor || ORDEM_NAIPE[a.naipe] - ORDEM_NAIPE[b.naipe]);
   return [...cartas].sort((a, b) => ORDEM_NAIPE[a.naipe] - ORDEM_NAIPE[b.naipe] || a.valor - b.valor);
 }
 

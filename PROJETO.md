@@ -15,6 +15,12 @@ Antes de abrir o jogo, aparece a mensagem:
 
 > Este jogo é para lembrar os velhos tempos em que Dil e Anderson jogavam o buraco aberto.
 
+## Placar e mão
+- **Placar em tempo real:** embaixo do total de cada equipe aparece **"+N na mesa"** — quanto ela já tem baixado nesta rodada (valor das cartas + canastras), atualizando a cada jogada
+- O desconto das cartas na mão só entra no fim da rodada (a mão do adversário é escondida)
+- **Ordem da mão:** botão **↕** acima da mão troca entre **Por naipe** (junta o mesmo naipe, bom para ver sequências), **Por número** (mistura os naipes) e **Como veio** (sem organizar); a escolha fica salva no aparelho
+- O embaralhamento é aleatório a cada rodada (testado em 3.000 partidas: em média 5 a 6 cartas vermelhas em 11)
+
 ## Botão Voltar
 - **Na sala ou na partida:** o Voltar do celular (ou o botão **← Menu** no placar) leva ao **menu principal**
   - Se a partida estava no meio, o lugar fica guardado e o menu mostra **Voltar para a partida**
