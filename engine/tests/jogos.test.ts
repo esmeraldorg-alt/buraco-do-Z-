@@ -38,8 +38,31 @@ describe('analisarJogo', () => {
     expect(analisarJogo(cs('3C', '4C')).valido).toBe(false);
   });
 
-  it('não aceita trinca', () => {
-    expect(analisarJogo([carta('7C'), carta('7O'), carta('7E')]).valido).toBe(false);
+  it('aceita trinca (mesmo valor, naipes quaisquer)', () => {
+    const a = analisarJogo([carta('7C'), carta('7O'), carta('7E')]);
+    expect(a.valido).toBe(true);
+    expect(a.tipo).toBe('trinca');
+    expect(a.canastra).toBeNull();
+  });
+
+  it('trinca pode repetir naipe (dois baralhos) e crescer', () => {
+    const a = analisarJogo([carta('QC', 0), carta('QC', 1), carta('QE'), carta('QO')]);
+    expect(a.valido).toBe(true);
+    expect(a.tipo).toBe('trinca');
+  });
+
+  it('trinca nunca vira canastra, mesmo com 7 cartas', () => {
+    const j = ['9C', '9O', '9E', '9P', '9C', '9O', '9E'].map((t, i) => carta(t, i));
+    expect(analisarJogo(j).valido).toBe(true);
+    expect(pontosBonusJogo(j)).toBe(0);
+  });
+
+  it('não vale trinca de 2', () => {
+    expect(analisarJogo([carta('2C'), carta('2O'), carta('2E')]).valido).toBe(false);
+  });
+
+  it('trinca com carta de valor diferente é inválida', () => {
+    expect(analisarJogo([carta('7C'), carta('7O'), carta('8E')]).valido).toBe(false);
   });
 
   it('2 substitui carta do mesmo naipe (suja)', () => {

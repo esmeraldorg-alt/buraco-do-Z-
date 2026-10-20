@@ -77,7 +77,7 @@ export function Mesa({ sala, usuario, emitir }: Props) {
   function pegarLixo() {
     const topo = jogo.lixo.at(-1);
     if (!topo) return setErro('O lixo está vazio');
-    if (selecionadas.length < 2) return setErro('Selecione as duas cartas da mão que casam com a carta do lixo');
+    if (selecionadas.length < 2) return setErro('Selecione as duas cartas da mão que fazem jogo (sequência ou trinca) com a carta do lixo');
     const jogada = montarJogadaLixo(topo, selecionadas);
     if (!jogada) return setErro('As cartas selecionadas não formam jogo com a carta do lixo');
     void jogar({ tipo: 'lixo', ...jogada });
@@ -279,11 +279,12 @@ function AreaJogos({
             return (
               <button
                 key={i}
-                className={`jogo ${a.canastra ? `canastra canastra-${a.canastra}` : ''}`}
+                className={`jogo ${a.canastra ? `canastra canastra-${a.canastra}` : ''} ${a.tipo === 'trinca' ? 'trinca' : ''}`}
                 onClick={aoTocar ? () => aoTocar(i) : undefined}
                 disabled={!aoTocar}
               >
                 {a.canastra && <span className="selo-canastra">{NOME_CANASTRA[a.canastra]}</span>}
+                {a.tipo === 'trinca' && <span className="selo-canastra">Trinca</span>}
                 <span className="jogo-cartas">
                   {j.map((c) => (
                     <Carta key={c.id} carta={c} tamanho="mini" curinga={a.curinga?.id === c.id} />

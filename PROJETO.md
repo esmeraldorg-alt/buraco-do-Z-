@@ -64,9 +64,12 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - No máximo **um 2 como curinga** por jogo; um 2 na posição natural (Ás-2-3) não conta como curinga
 
 ### Jogos
-- Sequências do **mesmo naipe**, com no mínimo 3 cartas
-- O Ás pode ficar antes do 2 (A-2-3) ou depois do Rei (Q-K-A)
-- **Canastra:** jogo com 7 cartas ou mais
+- **Sequência** do **mesmo naipe**, com no mínimo 3 cartas
+  - O Ás pode ficar antes do 2 (A-2-3) ou depois do Rei (Q-K-A)
+  - **Canastra:** sequência com 7 cartas ou mais
+- **Trinca:** 3 ou mais cartas do **mesmo valor** (naipes quaisquer); pode receber mais cartas depois
+  - Vale **só o valor das cartas** (nunca dá bônus de canastra)
+  - Sem 2 na trinca (não vale trinca de 2, nem 2 como curinga na trinca)
 
 ### Variante
 - **Buraco aberto:** pode baixar jogos a qualquer momento na sua vez
@@ -76,8 +79,8 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - O lixo começa vazio
 
 ### Lixo
-- Só pode pegar o lixo se tiver **duas cartas na mão** que formem jogo com a **última carta do lixo**
-- Ao pegar, esse jogo vai direto para a mesa e o resto do lixo vai para a mão
+- Só pode pegar o lixo se tiver **duas cartas na mão** que formem jogo (**sequência ou trinca**) com a **última carta do lixo**
+- Ao pegar, esse jogo (as duas da mão + a última do lixo) **é baixado obrigatoriamente** na mesa e o resto do lixo vai para a mão
 
 ### Vulnerável
 - Quando a equipe chega a **1500 pontos**, fica **vulnerável**
@@ -90,7 +93,7 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - Se o monte acabar, um morto que ninguém pegou vira monte; se não houver mais, a rodada termina
 
 ### Batidas
-1. **Primeira batida** (zerar a mão): pode ser com **canastra suja** → pega o morto
+1. **Primeira batida** (zerar a mão): **não precisa de canastra** → pega o morto
    - Bateu descartando: pega o morto e espera a próxima vez
    - Bateu baixando tudo: pega o morto e continua jogando
 2. **Segunda batida** (encerra a rodada): só se tiver **canastra limpa na mesa** → **+100 pontos**
@@ -118,8 +121,9 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - Se empatar acima de 3000, joga mais uma rodada
 
 ## Pendências
-- [ ] Confirmar: para a primeira batida (pegar o morto) é **obrigatório** ter ao menos uma canastra (suja serve)? Hoje está **sim** (configurável)
-- [ ] Confirmar: pode formar trinca (três cartas iguais de naipes diferentes)? Hoje está **não**, só sequência
+- [x] Primeira batida (pegar o morto) não precisa de canastra; a segunda precisa de canastra limpa
+- [x] Trinca vale, somando só o valor das cartas
+- [ ] Confirmar: o 2 pode entrar como curinga numa trinca? Hoje está **não**
 - [x] Criar repositório separado no GitHub
 - [ ] Escolher hospedagem com **disco permanente** (o SQLite precisa guardar contas e ranking): Railway com volume, Fly.io com volume ou Render com disco pago
 - [ ] Ícone/nome para o app Android

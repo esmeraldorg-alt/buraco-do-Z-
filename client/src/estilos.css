@@ -237,7 +237,8 @@ select { width: auto; padding: 6px 10px; }
 .jogo:disabled { opacity: 1; }
 .jogo-cartas { display: flex; }
 .jogo-cartas .carta + .carta { margin-left: -12px; }
-.jogo.canastra { padding-top: 14px; }
+.jogo.canastra, .jogo.trinca { padding-top: 14px; }
+.jogo.trinca .selo-canastra { color: var(--texto-sutil); }
 .selo-canastra { position: absolute; top: 1px; left: 4px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
 .canastra-limpa { background: rgba(127, 209, 163, 0.18); }
 .canastra-limpa .selo-canastra { color: var(--nos); }

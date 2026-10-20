@@ -9,7 +9,7 @@ export interface Config {
   bonusBatida: number;
   cartasPorJogador: number;
   cartasPorMorto: number;
-  /** Para a primeira batida (pegar o morto) é preciso ter ao menos uma canastra (suja serve) */
+  /** Para a primeira batida (pegar o morto) é preciso ter ao menos uma canastra — regra combinada: NÃO precisa */
   exigeCanastraParaMorto: boolean;
 }
 
@@ -20,7 +20,7 @@ export const CONFIG_PADRAO: Config = {
   bonusBatida: 100,
   cartasPorJogador: 11,
   cartasPorMorto: 11,
-  exigeCanastraParaMorto: true,
+  exigeCanastraParaMorto: false,
 };
 
 export type Fase = 'comprar' | 'jogar' | 'fimRodada' | 'fimPartida';

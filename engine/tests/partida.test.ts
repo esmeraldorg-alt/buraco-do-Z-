@@ -111,6 +111,32 @@ describe('lixo', () => {
     expect(e.fase).toBe('jogar');
   });
 
+  it('pega o lixo formando trinca com o par da mão', () => {
+    const mao = cs('7O', '7E', 'JP');
+    let e = cenario(2, (e) => {
+      e.lixo = cs('KO', '7C');
+      e.maos[0] = [...mao];
+    });
+    e = pegarLixo(e, 0, { par: [mao[0].id, mao[1].id] });
+    expect(e.equipes[0].jogos[0].map((c) => c.valor)).toEqual([7, 7, 7]);
+    expect(e.maos[0]).toHaveLength(2);
+  });
+
+  it('trinca soma só o valor das cartas na rodada', () => {
+    const ultima = cs('KP');
+    let e = cenario(2, (e) => {
+      e.equipes[0].jogos = [canastraLimpa(), cs('AC', 'AO', 'AE')];
+      e.equipes[0].pegouMorto = true;
+      e.mortos[0] = null;
+      e.maos[0] = [...ultima];
+      e.maos[1] = [];
+      e.fase = 'jogar';
+    });
+    e = descartar(e, 0, ultima[0].id);
+    // canastra 45 + trinca de Ás 45 = 90 de cartas; bônus só da canastra (200) + batida (100)
+    expect(e.historico[0].equipes[0]).toMatchObject({ pontosMesa: 90, bonusCanastras: 200, bonusBatida: 100 });
+  });
+
   it('não pega o lixo se o par não casa', () => {
     const mao = cs('5C', '9C', 'JP');
     const e = cenario(2, (e) => {
@@ -185,9 +211,32 @@ describe('batidas e morto', () => {
     expect(e.fase).toBe('jogar');
   });
 
-  it('sem canastra não pode bater para pegar o morto', () => {
+  it('primeira batida não precisa de canastra', () => {
+    const ultima = cs('KP');
+    let e = cenario(2, (e) => {
+      e.equipes[0].jogos = [cs('3P', '4P', '5P')];
+      e.maos[0] = [...ultima];
+      e.fase = 'jogar';
+    });
+    e = descartar(e, 0, ultima[0].id);
+    expect(e.equipes[0].pegouMorto).toBe(true);
+    expect(e.maos[0]).toHaveLength(11);
+  });
+
+  it('primeira batida sem nenhum jogo na mesa também pega o morto', () => {
+    const mao = cs('JP', 'QP', 'KP');
+    let e = cenario(2, (e) => {
+      e.maos[0] = [...mao];
+      e.fase = 'jogar';
+    });
+    e = baixarJogo(e, 0, ids(mao));
+    expect(e.equipes[0].pegouMorto).toBe(true);
+  });
+
+  it('se configurado, pode exigir canastra para pegar o morto', () => {
     const ultima = cs('KP');
     const e = cenario(2, (e) => {
+      e.config.exigeCanastraParaMorto = true;
       e.equipes[0].jogos = [cs('3P', '4P', '5P')];
       e.maos[0] = [...ultima];
       e.fase = 'jogar';

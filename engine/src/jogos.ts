@@ -3,8 +3,11 @@ import { Carta } from './cartas';
 
 export type TipoCanastra = 'limpa' | 'suja' | 'asAAs';
 
+export type TipoJogo = 'sequencia' | 'trinca';
+
 export interface AnaliseJogo {
   valido: boolean;
+  tipo: TipoJogo | null;
   motivo?: string;
   /** Cartas ordenadas na sequência (o curinga já na posição que ocupa) */
   ordenadas: Carta[];
@@ -24,12 +27,19 @@ export const PONTOS_CANASTRA: Record<TipoCanastra, number> = {
 
 export const TAMANHO_CANASTRA = 7;
 
+const ORDEM_NAIPE: Record<string, number> = { P: 0, C: 1, E: 2, O: 3 };
+
 function invalido(motivo: string): AnaliseJogo {
-  return { valido: false, motivo, ordenadas: [], curinga: null, posicaoCuringa: null, limpo: false, canastra: null };
+  return { valido: false, tipo: null, motivo, ordenadas: [], curinga: null, posicaoCuringa: null, limpo: false, canastra: null };
 }
 
 /**
- * Analisa se as cartas formam uma sequência válida do mesmo naipe.
+ * Analisa se as cartas formam um jogo válido.
+ *
+ * Trinca: 3 ou mais cartas do mesmo valor (naipes quaisquer), sem 2.
+ *   Vale só a soma das cartas — nunca dá bônus de canastra.
+ *
+ * Sequência do mesmo naipe:
  * - Mínimo 3 cartas, máximo 14 (Ás a Ás)
  * - Ás vale 1 (antes do 2) ou 14 (depois do Rei)
  * - No máximo um 2 servindo de curinga; um 2 na posição natural não é curinga
@@ -39,8 +49,24 @@ export function analisarJogo(cartas: Carta[]): AnaliseJogo {
   if (cartas.length < 3) return invalido('Um jogo precisa de pelo menos 3 cartas');
   if (cartas.length > 14) return invalido('Um jogo tem no máximo 14 cartas');
 
+  // Trinca (mesmo valor)
+  if (cartas.every((c) => c.valor === cartas[0].valor)) {
+    if (cartas[0].valor === 2) return invalido('Não vale trinca de 2');
+    return {
+      valido: true,
+      tipo: 'trinca',
+      ordenadas: [...cartas].sort((a, b) => ORDEM_NAIPE[a.naipe] - ORDEM_NAIPE[b.naipe]),
+      curinga: null,
+      posicaoCuringa: null,
+      limpo: true,
+      canastra: null,
+    };
+  }
+
   const naipe = cartas[0].naipe;
-  if (cartas.some((c) => c.naipe !== naipe)) return invalido('Todas as cartas precisam ser do mesmo naipe');
+  if (cartas.some((c) => c.naipe !== naipe)) {
+    return invalido('Sequência precisa ser do mesmo naipe (ou trinca: cartas do mesmo valor)');
+  }
 
   const ases = cartas.filter((c) => c.valor === 1);
   const dois = cartas.filter((c) => c.valor === 2);
@@ -104,6 +130,7 @@ export function analisarJogo(cartas: Carta[]): AnaliseJogo {
 
       const analise: AnaliseJogo = {
         valido: true,
+        tipo: 'sequencia',
         ordenadas: todas.map((t) => t.carta),
         curinga: temCuringa ? dois[curingaIdx] : null,
         posicaoCuringa: posCuringa,
