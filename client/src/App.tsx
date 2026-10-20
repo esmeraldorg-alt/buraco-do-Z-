@@ -6,6 +6,7 @@ import { Entrar } from './telas/Entrar';
 import { Lobby } from './telas/Lobby';
 import { Espera } from './telas/Espera';
 import { Mesa } from './telas/Mesa';
+import { desligarSom, ligarSom, somLigadoSalvo } from './som';
 
 /** Código de sala vindo do link compartilhado (?sala=ABCDE) */
 function salaDoLink(): string | null {
@@ -19,6 +20,13 @@ export function App() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [conviteSala, setConviteSala] = useState<string | null>(salaDoLink);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [somLigado, setSomLigado] = useState(somLigadoSalvo);
+
+  function alternarSom() {
+    if (somLigado) desligarSom();
+    else ligarSom();
+    setSomLigado(!somLigado);
+  }
 
   const sairDaConta = useCallback(() => {
     if (token) void api.sair(token).catch(() => {});
@@ -60,7 +68,16 @@ export function App() {
   }, [aviso]);
 
   let tela;
-  if (!viuAbertura) tela = <Abertura aoEntrar={() => setViuAbertura(true)} />;
+  if (!viuAbertura) {
+    tela = (
+      <Abertura
+        aoEntrar={() => {
+          setViuAbertura(true);
+          if (somLigado) ligarSom(); // o navegador só deixa tocar depois de um toque
+        }}
+      />
+    );
+  }
   else if (!token || !usuario) {
     tela = token ? (
       <div className="carregando">Carregando…</div>
@@ -81,6 +98,16 @@ export function App() {
   return (
     <>
       {tela}
+      {viuAbertura && (
+        <button
+          className="botao-som"
+          onClick={alternarSom}
+          aria-label={somLigado ? 'Desligar som ambiente' : 'Ligar som ambiente'}
+          title={somLigado ? 'Desligar som' : 'Ligar som'}
+        >
+          {somLigado ? '🔊' : '🔇'}
+        </button>
+      )}
       {usuario && pronto && !conectado && <div className="faixa-offline">Sem conexão — tentando reconectar…</div>}
       {aviso && <div className="toast">{aviso}</div>}
     </>

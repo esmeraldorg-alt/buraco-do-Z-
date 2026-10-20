@@ -46,11 +46,11 @@ function simular(numJogadores: 2 | 4, semente: number) {
 }
 
 describe('robô', () => {
-  it('acha trincas e sequências na mão', () => {
+  it('acha sequências na mão e ignora cartas iguais', () => {
     const mao = ['7C', '7O', '7E', '3P', '4P', '5P', 'KO', '2C'].map((t, i) => carta(t, i));
     const jogos = procurarJogos(mao, false).map((j) => j.map((c) => c.id).sort().join(','));
-    expect(jogos).toContain(['7C-0', '7O-1', '7E-2'].sort().join(','));
     expect(jogos).toContain(['3P-3', '4P-4', '5P-5'].sort().join(','));
+    expect(jogos).not.toContain(['7C-0', '7O-1', '7E-2'].sort().join(','));
   });
 
   it('pega o lixo quando tem o par', () => {

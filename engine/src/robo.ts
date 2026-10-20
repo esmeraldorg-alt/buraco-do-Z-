@@ -192,7 +192,7 @@ function decidirNaVez(estado: Estado, jogador: number): JogadaRobo {
 
   // Enquanto a equipe não tem canastra limpa, guarda as sequências limpas (o 2 vai para trincas)
   const temLimpa = temCanastraLimpa(jogos);
-  const podeSujar = (jogo: Carta[]) => temLimpa || analisarJogo(jogo).tipo === 'trinca';
+  const podeSujar = (jogo: Carta[]) => temLimpa || analisarJogo(jogo).tipo === 'trinca' || mao.length <= 4;
 
   // 3) Usar um 2 para fechar canastra (sequência com 6 cartas), se já tem limpa
   if (temLimpa) {

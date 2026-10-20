@@ -77,7 +77,7 @@ export function Mesa({ sala, usuario, emitir }: Props) {
   function pegarLixo() {
     const topo = jogo.lixo.at(-1);
     if (!topo) return setErro('O lixo está vazio');
-    if (selecionadas.length < 2) return setErro('Selecione as duas cartas da mão que fazem jogo (sequência ou trinca) com a carta do lixo');
+    if (selecionadas.length < 2) return setErro('Selecione as duas cartas da mão que fazem sequência com a carta do lixo');
     const jogada = montarJogadaLixo(topo, selecionadas);
     if (!jogada) return setErro('As cartas selecionadas não formam jogo com a carta do lixo');
     void jogar({ tipo: 'lixo', ...jogada });

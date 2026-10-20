@@ -302,3 +302,16 @@ select { width: auto; padding: 6px 10px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- som ---------- */
+.botao-som {
+  position: fixed; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 25;
+  width: 42px; height: 42px; border-radius: 50%;
+  border: 1px solid var(--borda); background: rgba(0, 0, 0, 0.45);
+  font-size: 1.15rem; line-height: 1; display: grid; place-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.botao-som:active { transform: scale(0.94); }
+/* Na mesa o botão de som fica no canto do placar, longe das cartas */
+.mesa .placar { padding-right: 44px; }
+main.mesa ~ .botao-som { top: calc(14px + env(safe-area-inset-top)); bottom: auto; right: 10px; width: 36px; height: 36px; font-size: 1rem; }

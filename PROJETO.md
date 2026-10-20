@@ -15,6 +15,12 @@ Antes de abrir o jogo, aparece a mensagem:
 
 > Este jogo é para lembrar os velhos tempos em que Dil e Anderson jogavam o buraco aberto.
 
+## Som ambiente
+- Som de cassino (burburinho do salão, fichas tilintando e um sininho de vez em quando), gerado no próprio navegador — sem arquivo de áudio
+- Começa ao tocar em "Entrar no jogo" (regra dos navegadores: só toca depois de um toque)
+- Botão 🔊/🔇 para ligar/desligar (na mesa fica no canto do placar); a escolha fica salva no aparelho
+- Pausa sozinho quando o app vai para segundo plano
+
 ## Robôs
 - Dá para jogar contra robôs: no lobby, **Jogar contra robô** (mano a mano: você x 1 robô; duplas: você + robô x 2 robôs)
 - Na sala de espera, quem criou a sala pode **Colocar robô** / **Tirar** em qualquer lugar vazio (ex.: 2 amigos + 2 robôs)
@@ -82,10 +88,9 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - **Sequência** do **mesmo naipe**, com no mínimo 3 cartas
   - O Ás pode ficar antes do 2 (A-2-3) ou depois do Rei (Q-K-A)
   - **Canastra:** sequência com 7 cartas ou mais
-- **Trinca:** 3 ou mais cartas do **mesmo valor** (naipes quaisquer); pode receber mais cartas depois
-  - Vale **só o valor das cartas** (nunca dá bônus de canastra)
-  - O **2 pode entrar na trinca** no lugar de uma carta (no máximo um 2, e pelo menos duas cartas naturais)
-  - Não vale trinca só de 2
+- **Trinca** = jogo de **3 cartas em sequência** do mesmo naipe (ex.: 7♥ 8♥ 9♥); vale só o valor das cartas
+  - O **2 pode entrar** no lugar de uma carta (ex.: 7♥ 8♥ 2♥)
+- **Cartas iguais de naipes diferentes NÃO valem** (ex.: 3♠ 3♦ 3♥ não é jogo)
 
 ### Variante
 - **Buraco aberto:** pode baixar jogos a qualquer momento na sua vez
@@ -95,7 +100,7 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - O lixo começa vazio
 
 ### Lixo
-- Só pode pegar o lixo se tiver **duas cartas na mão** que formem jogo (**sequência ou trinca**) com a **última carta do lixo**
+- Só pode pegar o lixo se tiver **duas cartas na mão** que formem **sequência** com a **última carta do lixo**
 - Ao pegar, esse jogo (as duas da mão + a última do lixo) **é baixado obrigatoriamente** na mesa e o resto do lixo vai para a mão
 
 ### Vulnerável
@@ -139,8 +144,8 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 
 ## Pendências
 - [x] Primeira batida (pegar o morto) não precisa de canastra; a segunda precisa de canastra limpa
-- [x] Trinca vale, somando só o valor das cartas
-- [x] O 2 pode entrar como curinga na trinca
+- [x] "Trinca" = 3 cartas em sequência (soma só o valor das cartas); cartas iguais de naipes diferentes não valem
+- [x] O 2 pode entrar no lugar de uma carta da trinca
 - [x] Criar repositório separado no GitHub
 - [x] Hospedagem: Render grátis + MongoDB (igual ao dominó)
 - [ ] Criar o serviço no Render e colocar `MONGODB_URI`
@@ -157,4 +162,5 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 4. [x] Placar e fim de partida
 5. [ ] Deploy web (Render + MongoDB — configuração pronta, falta criar o serviço)
 6. [x] Robôs para jogar sozinho ou completar a mesa
-7. [ ] App Android (mesmo esquema do dominó)
+7. [x] Som ambiente de cassino
+8. [ ] App Android (mesmo esquema do dominó)

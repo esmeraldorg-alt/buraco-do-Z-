@@ -29,6 +29,12 @@ export const TAMANHO_CANASTRA = 7;
 
 const ORDEM_NAIPE: Record<string, number> = { P: 0, C: 1, E: 2, O: 3 };
 
+/**
+ * Cartas iguais de naipes diferentes (ex.: 3♠ 3♦ 3♥) valem como jogo?
+ * Regra do Buraco do Zé: NÃO — "trinca" é o jogo de 3 cartas em sequência do mesmo naipe.
+ */
+export const PERMITE_CARTAS_IGUAIS = false;
+
 function invalido(motivo: string): AnaliseJogo {
   return { valido: false, tipo: null, motivo, ordenadas: [], curinga: null, posicaoCuringa: null, limpo: false, canastra: null };
 }
@@ -36,11 +42,7 @@ function invalido(motivo: string): AnaliseJogo {
 /**
  * Analisa se as cartas formam um jogo válido.
  *
- * Trinca: 3 ou mais cartas do mesmo valor (naipes quaisquer).
- *   Um 2 pode entrar no lugar de uma delas (no máximo um, e precisa de pelo menos 2 cartas naturais).
- *   Vale só a soma das cartas — nunca dá bônus de canastra.
- *
- * Sequência do mesmo naipe:
+ * Só vale sequência do mesmo naipe (cartas iguais de naipes diferentes só se PERMITE_CARTAS_IGUAIS):
  * - Mínimo 3 cartas, máximo 14 (Ás a Ás)
  * - Ás vale 1 (antes do 2) ou 14 (depois do Rei)
  * - No máximo um 2 servindo de curinga; um 2 na posição natural não é curinga
@@ -50,10 +52,14 @@ export function analisarJogo(cartas: Carta[]): AnaliseJogo {
   if (cartas.length < 3) return invalido('Um jogo precisa de pelo menos 3 cartas');
   if (cartas.length > 14) return invalido('Um jogo tem no máximo 14 cartas');
 
-  // Trinca: cartas do mesmo valor; um 2 pode entrar no lugar de uma delas
+  // Cartas iguais (desligado por regra): um 2 poderia entrar no lugar de uma delas
   const naturais = cartas.filter((c) => c.valor !== 2);
   const doisNaTrinca = cartas.filter((c) => c.valor === 2);
-  if (naturais.length >= 2 && naturais.every((c) => c.valor === naturais[0].valor)) {
+  const todasIguais = naturais.length >= 2 && naturais.every((c) => c.valor === naturais[0].valor);
+  if (todasIguais && !PERMITE_CARTAS_IGUAIS && new Set(naturais.map((c) => c.naipe)).size > 1) {
+    return invalido('Cartas iguais não valem: o jogo tem que ser em sequência do mesmo naipe');
+  }
+  if (PERMITE_CARTAS_IGUAIS && todasIguais) {
     if (doisNaTrinca.length > 1) return invalido('Na trinca só pode entrar um 2');
     const curinga = doisNaTrinca[0] ?? null;
     return {
@@ -69,7 +75,7 @@ export function analisarJogo(cartas: Carta[]): AnaliseJogo {
 
   const naipe = cartas[0].naipe;
   if (cartas.some((c) => c.naipe !== naipe)) {
-    return invalido('Sequência precisa ser do mesmo naipe (ou trinca: cartas do mesmo valor)');
+    return invalido('O jogo tem que ser em sequência do mesmo naipe');
   }
 
   const ases = cartas.filter((c) => c.valor === 1);

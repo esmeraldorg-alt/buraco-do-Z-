@@ -111,31 +111,29 @@ describe('lixo', () => {
     expect(e.fase).toBe('jogar');
   });
 
-  it('pega o lixo formando trinca com o par da mão', () => {
+  it('não pega o lixo com cartas iguais (só sequência)', () => {
     const mao = cs('7O', '7E', 'JP');
-    let e = cenario(2, (e) => {
+    const e = cenario(2, (e) => {
       e.lixo = cs('KO', '7C');
       e.maos[0] = [...mao];
     });
-    e = pegarLixo(e, 0, { par: [mao[0].id, mao[1].id] });
-    expect(e.equipes[0].jogos[0].map((c) => c.valor)).toEqual([7, 7, 7]);
-    expect(e.maos[0]).toHaveLength(2);
+    expect(() => pegarLixo(e, 0, { par: [mao[0].id, mao[1].id] })).toThrow('Cartas iguais');
   });
 
-  it('pega o lixo com trinca usando o 2 como curinga', () => {
-    const mao = cs('9O', '2E', 'JP');
+  it('pega o lixo com o 2 completando a sequência', () => {
+    const mao = cs('9C', '2C', 'JP');
     let e = cenario(2, (e) => {
-      e.lixo = cs('9C');
+      e.lixo = cs('10C');
       e.maos[0] = [...mao];
     });
     e = pegarLixo(e, 0, { par: [mao[0].id, mao[1].id] });
     expect(e.equipes[0].jogos[0]).toHaveLength(3);
   });
 
-  it('trinca soma só o valor das cartas na rodada', () => {
+  it('jogo de 3 cartas soma só o valor das cartas na rodada', () => {
     const ultima = cs('KP');
     let e = cenario(2, (e) => {
-      e.equipes[0].jogos = [canastraLimpa(), cs('AC', 'AO', 'AE')];
+      e.equipes[0].jogos = [canastraLimpa(), cs('QE', 'KE', 'AE')];
       e.equipes[0].pegouMorto = true;
       e.mortos[0] = null;
       e.maos[0] = [...ultima];
@@ -143,8 +141,8 @@ describe('lixo', () => {
       e.fase = 'jogar';
     });
     e = descartar(e, 0, ultima[0].id);
-    // canastra 45 + trinca de Ás 45 = 90 de cartas; bônus só da canastra (200) + batida (100)
-    expect(e.historico[0].equipes[0]).toMatchObject({ pontosMesa: 90, bonusCanastras: 200, bonusBatida: 100 });
+    // canastra 45 + Q-K-A 35 = 80 de cartas; bônus só da canastra (200) + batida (100)
+    expect(e.historico[0].equipes[0]).toMatchObject({ pontosMesa: 80, bonusCanastras: 200, bonusBatida: 100 });
   });
 
   it('não pega o lixo se o par não casa', () => {
