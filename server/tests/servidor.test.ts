@@ -1,22 +1,41 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { io as conectar, Socket } from 'socket.io-client';
 import { carta } from '@buraco-do-ze/engine';
 import { criarServidor } from '../src/index';
 import type { VisaoSala } from '../src/salas';
 
-let srv: ReturnType<typeof criarServidor>;
-let url = '';
+type Opcoes = Parameters<typeof criarServidor>[0];
 
-beforeAll(async () => {
-  srv = criarServidor({ caminhoBanco: ':memory:' });
+// Roda tudo com SQLite; e também com MongoDB se MONGODB_URI_TESTE estiver definida
+const bancos: [string, () => Opcoes][] = [
+  ['SQLite', () => ({ caminhoBanco: join(mkdtempSync(join(tmpdir(), 'buraco-')), 'teste.db') })],
+];
+if (process.env.MONGODB_URI_TESTE) {
+  bancos.push(['MongoDB', () => ({ caminhoBanco: ':memory:', mongoUri: process.env.MONGODB_URI_TESTE, mongoBanco: `buraco_teste_${Date.now()}` })]);
+}
+
+describe.each(bancos)('servidor com %s', (_nome, criarOpcoes) => {
+let srv: Awaited<ReturnType<typeof criarServidor>>;
+let url = '';
+let opcoes: Opcoes;
+
+async function subir() {
+  srv = await criarServidor(opcoes);
   await new Promise<void>((r) => srv.http.listen(0, r));
   url = `http://localhost:${(srv.http.address() as AddressInfo).port}`;
+}
+
+beforeAll(async () => {
+  opcoes = criarOpcoes();
+  await subir();
 });
 
 afterAll(async () => {
-  srv.io.close();
-  await new Promise((r) => srv.http.close(r));
+  await srv.encerrar();
 });
 
 async function post(caminho: string, corpo: unknown) {
@@ -178,4 +197,34 @@ describe('sala e partida', () => {
     expect((await cs[0].emitir('sala:iniciar')).ok).toBe(true);
     cs.forEach((c) => c.socket.close());
   });
+});
+
+describe('servidor reinicia (Render dormiu ou publicou versão nova)', () => {
+  it('a partida continua depois que o servidor volta', async () => {
+    const a = await cliente('Rita');
+    const b = await cliente('Caio');
+    const { codigo } = await a.emitir('sala:criar', { numJogadores: 2 });
+    await b.emitir('sala:entrar', { codigo });
+    await a.emitir('sala:iniciar');
+    const antes = (await a.esperar((v) => !!v?.jogo))!.jogo!.minhaMao.map((c) => c.id);
+    const tokenA = (a.socket as unknown as { auth: { token: string } }).auth.token;
+    a.socket.close();
+    b.socket.close();
+
+    await new Promise((r) => setTimeout(r, 400)); // dá tempo de gravar
+    await srv.encerrar();
+    await subir();
+
+    const volta = conectar(url, { auth: { token: tokenA }, transports: ['websocket'] });
+    const v = await new Promise<VisaoSala>((r) => volta.on('sala:estado', (x) => x && r(x)));
+    expect(v.codigo).toBe(codigo);
+    expect(v.jogo!.minhaMao.map((c) => c.id)).toEqual(antes);
+    expect(v.lugares[1]!.conectado).toBe(false);
+    volta.close();
+
+    // O cadastro também continua valendo
+    const login = await post('/api/login', { apelido: 'Caio', senha: 'segredo' });
+    expect(login.status).toBe(200);
+  });
+});
 });

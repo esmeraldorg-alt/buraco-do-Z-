@@ -36,7 +36,8 @@ function invalido(motivo: string): AnaliseJogo {
 /**
  * Analisa se as cartas formam um jogo válido.
  *
- * Trinca: 3 ou mais cartas do mesmo valor (naipes quaisquer), sem 2.
+ * Trinca: 3 ou mais cartas do mesmo valor (naipes quaisquer).
+ *   Um 2 pode entrar no lugar de uma delas (no máximo um, e precisa de pelo menos 2 cartas naturais).
  *   Vale só a soma das cartas — nunca dá bônus de canastra.
  *
  * Sequência do mesmo naipe:
@@ -49,16 +50,19 @@ export function analisarJogo(cartas: Carta[]): AnaliseJogo {
   if (cartas.length < 3) return invalido('Um jogo precisa de pelo menos 3 cartas');
   if (cartas.length > 14) return invalido('Um jogo tem no máximo 14 cartas');
 
-  // Trinca (mesmo valor)
-  if (cartas.every((c) => c.valor === cartas[0].valor)) {
-    if (cartas[0].valor === 2) return invalido('Não vale trinca de 2');
+  // Trinca: cartas do mesmo valor; um 2 pode entrar no lugar de uma delas
+  const naturais = cartas.filter((c) => c.valor !== 2);
+  const doisNaTrinca = cartas.filter((c) => c.valor === 2);
+  if (naturais.length >= 2 && naturais.every((c) => c.valor === naturais[0].valor)) {
+    if (doisNaTrinca.length > 1) return invalido('Na trinca só pode entrar um 2');
+    const curinga = doisNaTrinca[0] ?? null;
     return {
       valido: true,
       tipo: 'trinca',
-      ordenadas: [...cartas].sort((a, b) => ORDEM_NAIPE[a.naipe] - ORDEM_NAIPE[b.naipe]),
-      curinga: null,
+      ordenadas: [...naturais.sort((a, b) => ORDEM_NAIPE[a.naipe] - ORDEM_NAIPE[b.naipe]), ...doisNaTrinca],
+      curinga,
       posicaoCuringa: null,
-      limpo: true,
+      limpo: !curinga,
       canastra: null,
     };
   }

@@ -1,6 +1,6 @@
 // Cadastro e login por apelido + senha
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { BancoDeDados, Usuario } from './db';
+import { ApelidoEmUso, type Armazenamento, type Usuario } from './armazenamento';
 
 export class ErroAuth extends Error {}
 
@@ -31,21 +31,27 @@ export function validarSenha(senha: unknown): string {
   return senha;
 }
 
-export function cadastrar(db: BancoDeDados, apelido: unknown, senha: unknown): { usuario: Usuario; token: string } {
+export async function cadastrar(db: Armazenamento, apelido: unknown, senha: unknown): Promise<{ usuario: Usuario; token: string }> {
   const a = validarApelido(apelido);
   const s = validarSenha(senha);
-  if (db.buscarPorApelido(a)) throw new ErroAuth('Esse apelido já está em uso');
-  const usuario = db.criarUsuario(a, gerarHash(s));
+  if (await db.buscarPorApelido(a)) throw new ErroAuth('Esse apelido já está em uso');
+  let usuario: Usuario;
+  try {
+    usuario = await db.criarUsuario(a, gerarHash(s));
+  } catch (e) {
+    if (e instanceof ApelidoEmUso) throw new ErroAuth('Esse apelido já está em uso');
+    throw e;
+  }
   const token = randomBytes(24).toString('hex');
-  db.criarSessao(token, usuario.id);
+  await db.criarSessao(token, usuario.id);
   return { usuario, token };
 }
 
-export function entrar(db: BancoDeDados, apelido: unknown, senha: unknown): { usuario: Usuario; token: string } {
+export async function entrar(db: Armazenamento, apelido: unknown, senha: unknown): Promise<{ usuario: Usuario; token: string }> {
   if (typeof apelido !== 'string' || typeof senha !== 'string') throw new ErroAuth('Informe apelido e senha');
-  const u = db.buscarPorApelido(apelido.trim());
+  const u = await db.buscarPorApelido(apelido.trim());
   if (!u || !conferirSenha(senha, u.senhaHash)) throw new ErroAuth('Apelido ou senha incorretos');
   const token = randomBytes(24).toString('hex');
-  db.criarSessao(token, u.id);
+  await db.criarSessao(token, u.id);
   return { usuario: { id: u.id, apelido: u.apelido }, token };
 }

@@ -57,6 +57,22 @@ describe('analisarJogo', () => {
     expect(pontosBonusJogo(j)).toBe(0);
   });
 
+  it('2 pode entrar na trinca no lugar de uma carta', () => {
+    const a = analisarJogo([carta('7C'), carta('2E'), carta('7O')]);
+    expect(a.valido).toBe(true);
+    expect(a.tipo).toBe('trinca');
+    expect(a.curinga?.valor).toBe(2);
+    expect(a.limpo).toBe(false);
+  });
+
+  it('só um 2 por trinca', () => {
+    expect(analisarJogo([carta('7C'), carta('7O'), carta('2E'), carta('2C')]).valido).toBe(false);
+  });
+
+  it('trinca precisa de pelo menos duas cartas naturais', () => {
+    expect(analisarJogo([carta('7C'), carta('2E'), carta('2C')]).valido).toBe(false);
+  });
+
   it('não vale trinca de 2', () => {
     expect(analisarJogo([carta('2C'), carta('2O'), carta('2E')]).valido).toBe(false);
   });

@@ -12,7 +12,7 @@ import {
   pegarLixo,
   visaoDoJogador,
 } from '@buraco-do-ze/engine';
-import type { Usuario } from './db';
+import type { PartidaTerminada, Usuario } from './armazenamento';
 
 export class ErroSala extends Error {}
 
@@ -57,12 +57,6 @@ export interface ResumoSala {
   vagas: number;
 }
 
-export interface ResultadoPartida {
-  numJogadores: number;
-  pontos: [number, number];
-  equipeVencedora: number;
-  jogadores: { usuarioId: number; equipe: number }[];
-}
 
 const LETRAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -71,7 +65,29 @@ export class GerenciadorSalas {
   /** Em qual sala cada usuário está */
   salaDoUsuario = new Map<number, string>();
 
-  constructor(private aoTerminarPartida: (r: ResultadoPartida) => void = () => {}) {}
+  constructor(
+    private ganchos: {
+      aoTerminarPartida?: (r: PartidaTerminada) => void;
+      /** A sala mudou (para guardar e sobreviver a reinício do servidor) */
+      aoMudar?: (sala: Sala) => void;
+      aoApagar?: (codigo: string) => void;
+    } = {},
+  ) {}
+
+  private mudou(sala: Sala): Sala {
+    this.ganchos.aoMudar?.(sala);
+    return sala;
+  }
+
+  /** Recoloca salas guardadas (depois que o servidor reiniciou); todos começam desconectados */
+  restaurar(salas: Sala[]): void {
+    for (const s of salas) {
+      if (!s?.codigo || !Array.isArray(s.lugares)) continue;
+      s.lugares.forEach((l) => l && (l.conectado = false));
+      this.salas.set(s.codigo, s);
+      s.lugares.forEach((l) => l && this.salaDoUsuario.set(l.usuarioId, s.codigo));
+    }
+  }
 
   private novoCodigo(): string {
     let c: string;
@@ -112,7 +128,7 @@ export class GerenciadorSalas {
     sala.lugares[0] = { usuarioId: usuario.id, apelido: usuario.apelido, conectado: true };
     this.salas.set(sala.codigo, sala);
     this.salaDoUsuario.set(usuario.id, sala.codigo);
-    return sala;
+    return this.mudou(sala);
   }
 
   entrar(usuario: Usuario, codigo: string): Sala {
@@ -132,7 +148,7 @@ export class GerenciadorSalas {
     }
     this.salaDoUsuario.set(usuario.id, sala.codigo);
     sala.ultimaAtividade = Date.now();
-    return sala;
+    return this.mudou(sala);
   }
 
   /** Sai da sala. Antes de começar, libera o lugar; durante a partida, o lugar fica guardado. */
@@ -153,10 +169,11 @@ export class GerenciadorSalas {
       const outro = sala.lugares.find((l) => l && l.usuarioId !== usuarioId);
       if (outro) sala.donoId = outro.usuarioId;
     }
-    if (sala.lugares.every((l) => l === null || !l.conectado)) {
-      if (!emAndamento) this.apagar(sala);
+    if (sala.lugares.every((l) => l === null || !l.conectado) && !emAndamento) {
+      this.apagar(sala);
+      return sala;
     }
-    return sala;
+    return this.mudou(sala);
   }
 
   /** Marca desconectado (caiu a internet) sem tirar da sala */
@@ -165,12 +182,13 @@ export class GerenciadorSalas {
     if (!sala) return null;
     const i = this.lugarDe(sala, usuarioId);
     if (i !== null) sala.lugares[i]!.conectado = false;
-    return sala;
+    return this.mudou(sala);
   }
 
   private apagar(sala: Sala): void {
     this.salas.delete(sala.codigo);
     for (const [u, c] of this.salaDoUsuario) if (c === sala.codigo) this.salaDoUsuario.delete(u);
+    this.ganchos.aoApagar?.(sala.codigo);
   }
 
   /** Troca de lugar antes de começar (em duplas: lugares 1 e 3 são parceiros, 2 e 4 também) */
@@ -183,7 +201,7 @@ export class GerenciadorSalas {
     const atual = this.lugarDe(sala, usuarioId)!;
     sala.lugares[lugar] = sala.lugares[atual];
     sala.lugares[atual] = null;
-    return sala;
+    return this.mudou(sala);
   }
 
   iniciar(usuarioId: number): Sala {
@@ -195,7 +213,7 @@ export class GerenciadorSalas {
     sala.estado = criarPartida({ numJogadores: sala.numJogadores });
     sala.partidaRegistrada = false;
     sala.ultimaAtividade = Date.now();
-    return sala;
+    return this.mudou(sala);
   }
 
   /** Volta para a sala de espera depois de uma partida terminada */
@@ -206,7 +224,10 @@ export class GerenciadorSalas {
     if (!sala.estado || sala.estado.fase !== 'fimPartida') throw new ErroSala('A partida ainda não terminou');
     sala.estado = null;
     sala.lugares = sala.lugares.map((l) => (l && l.conectado ? l : null));
-    return sala;
+    for (const [u, c] of this.salaDoUsuario) {
+      if (c === sala.codigo && !sala.lugares.some((l) => l?.usuarioId === u)) this.salaDoUsuario.delete(u);
+    }
+    return this.mudou(sala);
   }
 
   jogar(usuarioId: number, acao: Acao): Sala {
@@ -242,14 +263,14 @@ export class GerenciadorSalas {
 
     if (sala.estado.fase === 'fimPartida' && !sala.partidaRegistrada && sala.estado.vencedor !== null) {
       sala.partidaRegistrada = true;
-      this.aoTerminarPartida({
+      this.ganchos.aoTerminarPartida?.({
         numJogadores: sala.numJogadores,
         pontos: [sala.estado.equipes[0].pontos, sala.estado.equipes[1].pontos],
         equipeVencedora: sala.estado.vencedor,
-        jogadores: sala.lugares.map((l, i) => ({ usuarioId: l!.usuarioId, equipe: equipeDe(i) })),
+        jogadores: sala.lugares.map((l, i) => ({ usuarioId: l!.usuarioId, apelido: l!.apelido, equipe: equipeDe(i) })),
       });
     }
-    return sala;
+    return this.mudou(sala);
   }
 
   visao(sala: Sala, usuarioId: number): VisaoSala {

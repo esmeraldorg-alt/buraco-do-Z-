@@ -20,15 +20,23 @@ Antes de abrir o jogo, aparece a mensagem:
 - **Ranking:** por **partidas vencidas**, **individual** (por jogador, não por dupla)
   - Em duplas, a vitória conta para os dois parceiros
   - **Zera todo mês** (ranking mensal); manter histórico dos meses anteriores
-- Banco de dados: **SQLite** embutido no Node (arquivo `server/dados/buraco.db`, ou `DB_PATH`)
+- Banco de dados: **MongoDB** em produção (mesmo esquema do Dominó do Meladinha, variável `MONGODB_URI`, banco `buraco`); sem `MONGODB_URI` usa **SQLite** local (`server/dados/buraco.db` ou `DB_PATH`)
+- As mesas em andamento também são guardadas: se o servidor dormir/reiniciar, a partida continua de onde parou
 - Senhas guardadas com hash (scrypt); login fica salvo no aparelho
 
 ## Stack (confirmada)
 - **Motor de regras:** TypeScript puro (`engine/`), sem dependências, com testes (Vitest)
 - **Frontend:** React + Vite (TypeScript), layout responsivo para celular (`client/`)
-- **Servidor:** Node.js 22+ com Express + Socket.IO (tempo real) + SQLite (`server/`); a lógica roda toda no servidor (evita trapaça)
-- **Android depois:** Capacitor empacotando o mesmo frontend web
-- **Hospedagem:** a definir (Render, Railway ou VPS)
+- **Servidor:** Node.js 22+ com Express + Socket.IO (tempo real) + MongoDB/SQLite (`server/`); a lógica roda toda no servidor (evita trapaça)
+- **Android depois:** mesmo esquema do dominó (app que abre o jogo do servidor, APK gerado pelo GitHub Actions)
+- **Hospedagem:** **Render, plano grátis** (`render.yaml`), igual ao Dominó do Meladinha
+
+## Publicar no Render (uma vez)
+1. No Render: **New → Blueprint** → escolher o repositório `buraco-do-Z-` (ele lê o `render.yaml`)
+2. Em **Environment**, preencher `MONGODB_URI` com a **mesma** conexão do MongoDB do dominó (o buraco usa outro banco, `buraco`, então não mistura os dados)
+3. Esperar o deploy; o link fica tipo `https://buraco-do-ze.onrender.com`
+4. Plano grátis dorme depois de ~15 min sem uso; a primeira abertura demora ~1 minuto para acordar
+5. Cada push na `main` publica a versão nova sozinho
 
 ## Estrutura do código
 ```
@@ -69,7 +77,8 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
   - **Canastra:** sequência com 7 cartas ou mais
 - **Trinca:** 3 ou mais cartas do **mesmo valor** (naipes quaisquer); pode receber mais cartas depois
   - Vale **só o valor das cartas** (nunca dá bônus de canastra)
-  - Sem 2 na trinca (não vale trinca de 2, nem 2 como curinga na trinca)
+  - O **2 pode entrar na trinca** no lugar de uma carta (no máximo um 2, e pelo menos duas cartas naturais)
+  - Não vale trinca só de 2
 
 ### Variante
 - **Buraco aberto:** pode baixar jogos a qualquer momento na sua vez
@@ -123,9 +132,10 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 ## Pendências
 - [x] Primeira batida (pegar o morto) não precisa de canastra; a segunda precisa de canastra limpa
 - [x] Trinca vale, somando só o valor das cartas
-- [ ] Confirmar: o 2 pode entrar como curinga numa trinca? Hoje está **não**
+- [x] O 2 pode entrar como curinga na trinca
 - [x] Criar repositório separado no GitHub
-- [ ] Escolher hospedagem com **disco permanente** (o SQLite precisa guardar contas e ranking): Railway com volume, Fly.io com volume ou Render com disco pago
+- [x] Hospedagem: Render grátis + MongoDB (igual ao dominó)
+- [ ] Criar o serviço no Render e colocar `MONGODB_URI`
 - [ ] Ícone/nome para o app Android
 
 ## Lembretes
@@ -137,5 +147,5 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 2. [x] Servidor: cadastro/login (apelido + senha), salas (criar/entrar por código, 2 ou 4 jogadores), ranking mensal
 3. [x] Telas: abertura, login, lobby, espera, mesa (mão, lixo, morto, jogos baixados)
 4. [x] Placar e fim de partida
-5. [ ] Deploy web
-6. [ ] App Android (Capacitor)
+5. [ ] Deploy web (Render + MongoDB — configuração pronta, falta criar o serviço)
+6. [ ] App Android (mesmo esquema do dominó)

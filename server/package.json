@@ -12,6 +12,7 @@
   "dependencies": {
     "@buraco-do-ze/engine": "*",
     "express": "^4.21.0",
+    "mongodb": "^6.21.0",
     "socket.io": "^4.8.0",
     "tsx": "^4.19.0"
   },

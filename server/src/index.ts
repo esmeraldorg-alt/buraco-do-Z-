@@ -6,13 +6,43 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server, Socket } from 'socket.io';
 import { ErroJogada } from '@buraco-do-ze/engine';
-import { abrirBanco, mesAtual, type Usuario } from './db';
+import { abrirArmazenamento, mesAtual, type Usuario } from './armazenamento';
 import { ErroAuth, cadastrar, entrar } from './auth';
 import { Acao, ErroSala, GerenciadorSalas, Sala } from './salas';
 
-export function criarServidor(opcoes: { caminhoBanco: string; pastaCliente?: string }) {
-  const db = abrirBanco(opcoes.caminhoBanco);
-  const salas = new GerenciadorSalas((r) => db.registrarPartida(r));
+const SEIS_HORAS = 6 * 60 * 60 * 1000;
+
+export async function criarServidor(opcoes: {
+  caminhoBanco: string;
+  mongoUri?: string;
+  mongoBanco?: string;
+  pastaCliente?: string;
+}) {
+  const db = await abrirArmazenamento({ mongoUri: opcoes.mongoUri, mongoBanco: opcoes.mongoBanco, caminhoSqlite: opcoes.caminhoBanco });
+
+  // Guarda as salas com um pequeno atraso, juntando várias jogadas seguidas numa gravação só
+  const pendentes = new Map<string, ReturnType<typeof setTimeout>>();
+  const gravar = (sala: Sala) => {
+    clearTimeout(pendentes.get(sala.codigo));
+    pendentes.set(
+      sala.codigo,
+      setTimeout(() => {
+        pendentes.delete(sala.codigo);
+        db.salvarSala(sala.codigo, sala).catch((e) => console.error('Não consegui guardar a sala:', e.message));
+      }, 300),
+    );
+  };
+
+  const salas = new GerenciadorSalas({
+    aoTerminarPartida: (r) => db.registrarPartida(r).catch((e) => console.error('Não consegui registrar a partida:', e)),
+    aoMudar: gravar,
+    aoApagar: (codigo) => {
+      clearTimeout(pendentes.get(codigo));
+      pendentes.delete(codigo);
+      db.apagarSala(codigo).catch(() => {});
+    },
+  });
+  salas.restaurar((await db.carregarSalas(SEIS_HORAS)) as Sala[]);
 
   const app = express();
   app.use(express.json());
@@ -23,64 +53,74 @@ export function criarServidor(opcoes: { caminhoBanco: string; pastaCliente?: str
     return res.status(500).json({ erro: 'Erro no servidor' });
   };
 
-  app.post('/api/cadastro', (req, res) => {
+  const tokenDoPedido = (req: express.Request) => (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+
+  app.get('/healthz', (_req, res) => res.send('ok'));
+
+  app.post('/api/cadastro', async (req, res) => {
     try {
-      const { usuario, token } = cadastrar(db, req.body?.apelido, req.body?.senha);
-      res.json({ usuario, token });
+      res.json(await cadastrar(db, req.body?.apelido, req.body?.senha));
     } catch (e) {
       responderErro(res, e);
     }
   });
 
-  app.post('/api/login', (req, res) => {
+  app.post('/api/login', async (req, res) => {
     try {
-      const { usuario, token } = entrar(db, req.body?.apelido, req.body?.senha);
-      res.json({ usuario, token });
+      res.json(await entrar(db, req.body?.apelido, req.body?.senha));
     } catch (e) {
       responderErro(res, e);
     }
   });
 
-  const usuarioDoPedido = (req: express.Request): Usuario | null => {
-    const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
-    return token ? db.usuarioDaSessao(token) : null;
-  };
-
-  app.get('/api/eu', (req, res) => {
-    const u = usuarioDoPedido(req);
-    if (!u) return res.status(401).json({ erro: 'Faça login de novo' });
-    res.json({ usuario: u });
+  app.get('/api/eu', async (req, res) => {
+    try {
+      const token = tokenDoPedido(req);
+      const u = token ? await db.usuarioDaSessao(token) : null;
+      if (!u) return res.status(401).json({ erro: 'Faça login de novo' });
+      res.json({ usuario: u });
+    } catch (e) {
+      responderErro(res, e);
+    }
   });
 
-  app.post('/api/sair', (req, res) => {
-    const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
-    if (token) db.apagarSessao(token);
+  app.post('/api/sair', async (req, res) => {
+    const token = tokenDoPedido(req);
+    if (token) await db.apagarSessao(token).catch(() => {});
     res.json({ ok: true });
   });
 
-  app.get('/api/ranking', (req, res) => {
-    const mes = typeof req.query.mes === 'string' && /^\d{4}-\d{2}$/.test(req.query.mes) ? req.query.mes : mesAtual();
-    const meses = db.mesesComPartidas();
-    if (!meses.includes(mesAtual())) meses.unshift(mesAtual());
-    res.json({ mes, meses, ranking: db.ranking(mes) });
+  app.get('/api/ranking', async (req, res) => {
+    try {
+      const mes = typeof req.query.mes === 'string' && /^\d{4}-\d{2}$/.test(req.query.mes) ? req.query.mes : mesAtual();
+      const meses = await db.mesesComPartidas();
+      if (!meses.includes(mesAtual())) meses.unshift(mesAtual());
+      res.json({ mes, meses, ranking: await db.ranking(mes) });
+    } catch (e) {
+      responderErro(res, e);
+    }
   });
 
   // Em produção, o servidor também entrega as telas (client/dist)
   if (opcoes.pastaCliente && existsSync(opcoes.pastaCliente)) {
     app.use(express.static(opcoes.pastaCliente));
-    app.get(/^\/(?!api|socket\.io).*/, (_req, res) => res.sendFile(join(opcoes.pastaCliente!, 'index.html')));
+    app.get(/^\/(?!api|socket\.io|healthz).*/, (_req, res) => res.sendFile(join(opcoes.pastaCliente!, 'index.html')));
   }
 
   const http = createServer(app);
   const io = new Server(http, { cors: { origin: true } });
 
   // Autenticação do socket pelo token
-  io.use((socket, next) => {
-    const token = socket.handshake.auth?.token;
-    const u = typeof token === 'string' ? db.usuarioDaSessao(token) : null;
-    if (!u) return next(new Error('nao-autenticado'));
-    socket.data.usuario = u;
-    next();
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+      const u = typeof token === 'string' ? await db.usuarioDaSessao(token) : null;
+      if (!u) return next(new Error('nao-autenticado'));
+      socket.data.usuario = u;
+      next();
+    } catch {
+      next(new Error('erro-servidor'));
+    }
   });
 
   const sala$ = (codigo: string) => `sala:${codigo}`;
@@ -120,7 +160,7 @@ export function criarServidor(opcoes: { caminhoBanco: string; pastaCliente?: str
   io.on('connection', (socket) => {
     const usuario = socket.data.usuario as Usuario;
 
-    // Se estava numa sala (caiu a conexão / recarregou a página), volta para ela
+    // Se estava numa sala (caiu a conexão / recarregou a página / o servidor reiniciou), volta para ela
     const anterior = salas.salaDe(usuario.id);
     if (anterior) {
       tratar(socket, () => salas.entrar(usuario, anterior.codigo));
@@ -171,19 +211,37 @@ export function criarServidor(opcoes: { caminhoBanco: string; pastaCliente?: str
     });
   });
 
-  const limpeza = setInterval(() => salas.limpar(), 30 * 60 * 1000);
+  const limpeza = setInterval(() => salas.limpar(SEIS_HORAS), 30 * 60 * 1000);
   limpeza.unref();
 
-  return { app, http, io, db, salas };
+  /** Grava o que estiver pendente e fecha tudo */
+  async function encerrar() {
+    for (const [codigo, t] of pendentes) {
+      clearTimeout(t);
+      const s = salas.salas.get(codigo);
+      if (s) await db.salvarSala(codigo, s).catch(() => {});
+    }
+    pendentes.clear();
+    io.close();
+    await new Promise((r) => http.close(r));
+    await db.fechar();
+  }
+
+  return { app, http, io, db, salas, encerrar };
 }
 
 // Execução direta: `tsx src/index.ts`
 const aqui = dirname(fileURLToPath(import.meta.url));
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const porta = Number(process.env.PORT ?? 3001);
-  const { http } = criarServidor({
+  const srv = await criarServidor({
     caminhoBanco: process.env.DB_PATH ?? join(aqui, '..', 'dados', 'buraco.db'),
+    mongoUri: process.env.MONGODB_URI,
+    mongoBanco: process.env.MONGODB_DB ?? 'buraco',
     pastaCliente: join(aqui, '..', '..', 'client', 'dist'),
   });
-  http.listen(porta, () => console.log(`Buraco do Zé rodando em http://localhost:${porta}`));
+  srv.http.listen(porta, () => console.log(`Buraco do Zé rodando na porta ${porta} — dados em ${srv.db.tipo}`));
+  for (const sinal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(sinal, () => void srv.encerrar().finally(() => process.exit(0)));
+  }
 }

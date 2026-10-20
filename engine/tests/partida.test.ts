@@ -122,6 +122,16 @@ describe('lixo', () => {
     expect(e.maos[0]).toHaveLength(2);
   });
 
+  it('pega o lixo com trinca usando o 2 como curinga', () => {
+    const mao = cs('9O', '2E', 'JP');
+    let e = cenario(2, (e) => {
+      e.lixo = cs('9C');
+      e.maos[0] = [...mao];
+    });
+    e = pegarLixo(e, 0, { par: [mao[0].id, mao[1].id] });
+    expect(e.equipes[0].jogos[0]).toHaveLength(3);
+  });
+
   it('trinca soma só o valor das cartas na rodada', () => {
     const ultima = cs('KP');
     let e = cenario(2, (e) => {
