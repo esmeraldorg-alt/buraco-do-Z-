@@ -131,9 +131,17 @@ export function Lobby({ usuario, abertas, emitir, aoSairDaConta, partidaPendente
       )}
 
       <Ranking destaque={usuario.apelido} />
+
+      {/Android/i.test(navigator.userAgent) && !/BuracoDoZeApp/.test(navigator.userAgent) && (
+        <a className="botao botao-secundario baixar-app" href={LINK_APK}>
+          📲 Baixar o app para Android
+        </a>
+      )}
     </main>
   );
 }
+
+const LINK_APK = 'https://github.com/esmeraldorg-alt/buraco-do-Z-/releases/latest/download/BuracoDoZe.apk';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 

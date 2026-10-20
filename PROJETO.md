@@ -49,6 +49,16 @@ Antes de abrir o jogo, aparece a mensagem:
 - **Android depois:** mesmo esquema do dominó (app que abre o jogo do servidor, APK gerado pelo GitHub Actions)
 - **Hospedagem:** **Render, plano grátis** (`render.yaml`), igual ao Dominó do Meladinha
 
+## App Android
+- Pasta `android/`: app simples que abre o jogo do servidor (`https://buraco-do-ze.onrender.com/`) em tela cheia, em pé
+- Mudanças no jogo chegam sozinhas pelo servidor — **não precisa de APK novo** a cada mudança
+- O APK é gerado pelo GitHub Actions (`.github/workflows/apk.yml`) quando algo em `android/` muda, ou manualmente em Actions → Gerar APK → Run workflow
+- **Link fixo para baixar a versão mais nova:** https://github.com/esmeraldorg-alt/buraco-do-Z-/releases/latest/download/BuracoDoZe.apk
+- Instalar: abrir o link no celular, baixar e permitir "instalar apps desconhecidos" para o navegador
+- No navegador do Android, o menu do jogo mostra o botão **📲 Baixar o app para Android**
+- Botão Voltar do celular funciona igual ao do navegador; "Sim, sair" fecha o app
+- Assinatura: `android/debug.keystore` (mesma chave sempre, para as atualizações instalarem por cima)
+
 ## Publicar no Render (uma vez)
 1. No Render: **New → Blueprint** → escolher o repositório `buraco-do-Z-` (ele lê o `render.yaml`)
 2. Em **Environment**, preencher `MONGODB_URI` com a **mesma** conexão do MongoDB do dominó (o buraco usa outro banco, `buraco`, então não mistura os dados)
@@ -168,4 +178,4 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 5. [ ] Deploy web (Render + MongoDB — configuração pronta, falta criar o serviço)
 6. [x] Robôs para jogar sozinho ou completar a mesa
 7. [x] Som ambiente de cassino
-8. [ ] App Android (mesmo esquema do dominó)
+8. [x] App Android (mesmo esquema do dominó)

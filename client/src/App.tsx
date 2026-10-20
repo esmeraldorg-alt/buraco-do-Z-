@@ -79,6 +79,12 @@ export function App() {
     saindoRef.current = true;
     desligarSom();
     setSomLigado(somLigadoSalvo());
+    // Dentro do app Android: fecha o app de verdade
+    const app = (window as unknown as { BuracoApp?: { sair: () => void } }).BuracoApp;
+    if (app) {
+      app.sair();
+      return;
+    }
     history.go(-2);
     // Se não houver página anterior (app aberto direto), fica aqui e avisa
     setTimeout(() => {

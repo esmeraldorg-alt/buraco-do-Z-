@@ -319,3 +319,5 @@ main.mesa ~ .botao-som { top: calc(14px + env(safe-area-inset-top)); bottom: aut
 .link-menu { padding: 2px 0; font-size: 0.75rem; }
 .cartao-destaque { border-color: var(--ouro); background: rgba(232, 184, 74, 0.12); }
 .janela.centro .botoes-lado { margin-top: 14px; }
+
+.baixar-app { text-decoration: none; width: 100%; }
