@@ -3,7 +3,7 @@
 Jogo de buraco próprio para jogar online com amigos (inspirado no BuracoON).
 
 - **Nome:** Buraco do Zé
-- **Repositório:** `buraco-do-ze` (repositório separado no GitHub)
+- **Repositório:** https://github.com/esmeraldorg-alt/buraco-do-Z- (privado)
 
 ## Visão geral
 - **Plataforma:** Web primeiro (celular e PC pelo navegador), depois app Android
@@ -20,19 +20,41 @@ Antes de abrir o jogo, aparece a mensagem:
 - **Ranking:** por **partidas vencidas**, **individual** (por jogador, não por dupla)
   - Em duplas, a vitória conta para os dois parceiros
   - **Zera todo mês** (ranking mensal); manter histórico dos meses anteriores
-- Precisa de banco de dados no servidor (proposta: PostgreSQL, ou SQLite no começo)
+- Banco de dados: **SQLite** embutido no Node (arquivo `server/dados/buraco.db`, ou `DB_PATH`)
+- Senhas guardadas com hash (scrypt); login fica salvo no aparelho
 
 ## Stack (confirmada)
 - **Motor de regras:** TypeScript puro (`engine/`), sem dependências, com testes (Vitest)
-- **Frontend:** React + Vite (TypeScript), layout responsivo para celular
-- **Servidor:** Node.js + Socket.IO (tempo real); a lógica roda toda no servidor (evita trapaça)
+- **Frontend:** React + Vite (TypeScript), layout responsivo para celular (`client/`)
+- **Servidor:** Node.js 22+ com Express + Socket.IO (tempo real) + SQLite (`server/`); a lógica roda toda no servidor (evita trapaça)
 - **Android depois:** Capacitor empacotando o mesmo frontend web
 - **Hospedagem:** a definir (Render, Railway ou VPS)
 
-## Tela de abertura
-Antes de abrir o jogo, aparece uma mensagem de homenagem (texto a confirmar):
+## Estrutura do código
+```
+engine/   motor de regras (cartas, jogos, partida, pontuação) + testes
+server/   API (cadastro, login, ranking) + Socket.IO (salas e jogadas) + testes
+client/   telas: abertura, entrar/criar conta, lobby, sala de espera, mesa
+```
 
-> "Esse jogo é para lembrar os velhos tempos em que Dil e Anderson jogavam o buraco aberto."
+## Como rodar no computador
+```bash
+npm install          # na raiz, instala tudo
+npm test             # testes do motor e do servidor
+npm run dev:server   # servidor em http://localhost:3001
+npm run dev:client   # telas em http://localhost:5173 (outro terminal)
+```
+Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na porta `PORT`).
+
+## Como jogar (telas)
+- Abertura com a homenagem → entrar ou criar conta → lobby
+- Lobby: criar sala (mano a mano ou duplas), entrar com código, salas abertas, ranking do mês
+- Sala de espera: código + botão "Chamar os amigos" (link `?sala=CÓDIGO`); em duplas, cada um escolhe o lugar (1 e 3 x 2 e 4)
+- Mesa: toque nas cartas para selecionar
+  - **Comprar** (ou tocar no monte) / **Pegar lixo** (selecione o par; vulnerável: selecione também o jogo extra para somar 75)
+  - **Baixar jogo** (3+ cartas) / tocar num jogo seu para **encaixar** / **Descartar** (1 carta)
+- Fim de rodada mostra os pontos; fim de partida registra a vitória no ranking
+- Se a internet cair ou fechar a página, ao voltar a pessoa cai de novo na mesma partida
 
 ## Regras do jogo
 
@@ -98,7 +120,9 @@ Antes de abrir o jogo, aparece uma mensagem de homenagem (texto a confirmar):
 ## Pendências
 - [ ] Confirmar: para a primeira batida (pegar o morto) é **obrigatório** ter ao menos uma canastra (suja serve)? Hoje está **sim** (configurável)
 - [ ] Confirmar: pode formar trinca (três cartas iguais de naipes diferentes)? Hoje está **não**, só sequência
-- [ ] Criar repositório separado no GitHub: `buraco-do-ze`
+- [x] Criar repositório separado no GitHub
+- [ ] Escolher hospedagem com **disco permanente** (o SQLite precisa guardar contas e ranking): Railway com volume, Fly.io com volume ou Render com disco pago
+- [ ] Ícone/nome para o app Android
 
 ## Lembretes
 - Repositório próprio no Git para este projeto
@@ -106,8 +130,8 @@ Antes de abrir o jogo, aparece uma mensagem de homenagem (texto a confirmar):
 
 ## Roadmap
 1. [x] Motor de regras (baralho, validação de jogos, canastras, lixo, morto, vulnerável, pontuação) + testes
-2. [ ] Servidor: cadastro/login (apelido + senha), salas (criar/entrar por código, 2 ou 4 jogadores), ranking mensal
-3. [ ] Interface da mesa (mão, lixo, morto, jogos baixados, arrastar cartas)
-4. [ ] Placar e fim de partida
+2. [x] Servidor: cadastro/login (apelido + senha), salas (criar/entrar por código, 2 ou 4 jogadores), ranking mensal
+3. [x] Telas: abertura, login, lobby, espera, mesa (mão, lixo, morto, jogos baixados)
+4. [x] Placar e fim de partida
 5. [ ] Deploy web
 6. [ ] App Android (Capacitor)
