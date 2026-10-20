@@ -15,6 +15,13 @@ Antes de abrir o jogo, aparece a mensagem:
 
 > Este jogo é para lembrar os velhos tempos em que Dil e Anderson jogavam o buraco aberto.
 
+## Robôs
+- Dá para jogar contra robôs: no lobby, **Jogar contra robô** (mano a mano: você x 1 robô; duplas: você + robô x 2 robôs)
+- Na sala de espera, quem criou a sala pode **Colocar robô** / **Tirar** em qualquer lugar vazio (ex.: 2 amigos + 2 robôs)
+- O robô joga sozinho, com um intervalo entre as jogadas para dar para acompanhar
+- Estratégia: pega o lixo quando tem o par (vulnerável, junta jogos para os 75 pontos), prefere sequências (viram canastra), guarda o 2 até ter canastra limpa, descarta a carta menos útil e evita dar carta que encaixa no jogo do adversário
+- **Partida com robô conta no ranking** para as pessoas da mesa; robô não aparece no ranking
+
 ## Cadastro e ranking
 - **Cadastro de usuário:** apelido + senha (simples, para jogar entre amigos)
 - **Ranking:** por **partidas vencidas**, **individual** (por jogador, não por dupla)
@@ -124,6 +131,7 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 
 - Cartas baixadas na mesa **somam**
 - Cartas que sobram na mão de quem não bateu **descontam**
+- Não pode ficar com **1 carta só** se ainda não pode bater (descartar a última carta é bater); o jogo avisa para ficar com pelo menos 2
 
 ### Fim da partida
 - Partida termina quando uma equipe chega a **3000 pontos**
@@ -148,4 +156,5 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 3. [x] Telas: abertura, login, lobby, espera, mesa (mão, lixo, morto, jogos baixados)
 4. [x] Placar e fim de partida
 5. [ ] Deploy web (Render + MongoDB — configuração pronta, falta criar o serviço)
-6. [ ] App Android (mesmo esquema do dominó)
+6. [x] Robôs para jogar sozinho ou completar a mesa
+7. [ ] App Android (mesmo esquema do dominó)

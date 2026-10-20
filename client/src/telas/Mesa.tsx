@@ -123,6 +123,7 @@ export function Mesa({ sala, usuario, emitir }: Props) {
             }`}
           >
             <span className="adv-nome">
+              {sala.lugares[i]?.robo && '🤖 '}
               {nomeJogador(i)}
               {i % 2 === minhaEquipe && n === 4 && <small> (parceiro)</small>}
             </span>

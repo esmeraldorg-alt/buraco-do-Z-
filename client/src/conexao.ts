@@ -7,6 +7,7 @@ export interface Lugar {
   usuarioId: number;
   apelido: string;
   conectado: boolean;
+  robo?: boolean;
 }
 
 export interface VisaoSala {

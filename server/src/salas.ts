@@ -6,6 +6,7 @@ import {
   baixarJogo,
   comprarMonte,
   criarPartida,
+  decidirJogadaRobo,
   descartar,
   equipeDe,
   novaRodada,
@@ -20,7 +21,11 @@ export interface Lugar {
   usuarioId: number;
   apelido: string;
   conectado: boolean;
+  /** Robô controlado pelo servidor (id negativo) */
+  robo?: boolean;
 }
+
+const NOMES_ROBO = ['Robô Biu', 'Robô Tião', 'Robô Chico', 'Robô Neco'];
 
 export interface Sala {
   codigo: string;
@@ -83,9 +88,9 @@ export class GerenciadorSalas {
   restaurar(salas: Sala[]): void {
     for (const s of salas) {
       if (!s?.codigo || !Array.isArray(s.lugares)) continue;
-      s.lugares.forEach((l) => l && (l.conectado = false));
+      s.lugares.forEach((l) => l && (l.conectado = !!l.robo));
       this.salas.set(s.codigo, s);
-      s.lugares.forEach((l) => l && this.salaDoUsuario.set(l.usuarioId, s.codigo));
+      s.lugares.forEach((l) => l && !l.robo && this.salaDoUsuario.set(l.usuarioId, s.codigo));
     }
   }
 
@@ -164,12 +169,12 @@ export class GerenciadorSalas {
     // Durante a partida o vínculo fica guardado, para a pessoa poder voltar
     if (!emAndamento || i === null) this.salaDoUsuario.delete(usuarioId);
 
-    // Passa a dona da sala para outro jogador
+    // Passa a dona da sala para outra pessoa (robô não é dono)
     if (sala.donoId === usuarioId) {
-      const outro = sala.lugares.find((l) => l && l.usuarioId !== usuarioId);
+      const outro = sala.lugares.find((l) => l && !l.robo && l.usuarioId !== usuarioId);
       if (outro) sala.donoId = outro.usuarioId;
     }
-    if (sala.lugares.every((l) => l === null || !l.conectado) && !emAndamento) {
+    if (sala.lugares.every((l) => l === null || l.robo || !l.conectado) && !emAndamento) {
       this.apagar(sala);
       return sala;
     }
@@ -204,6 +209,60 @@ export class GerenciadorSalas {
     return this.mudou(sala);
   }
 
+  /** Quem criou a sala coloca um robô num lugar vazio */
+  colocarRobo(usuarioId: number, lugar: number): Sala {
+    const sala = this.salaDe(usuarioId);
+    if (!sala) throw new ErroSala('Você não está numa sala');
+    if (sala.donoId !== usuarioId) throw new ErroSala('Só quem criou a sala pode colocar robô');
+    if (sala.estado) throw new ErroSala('A partida já começou');
+    if (!(lugar >= 0 && lugar < sala.numJogadores)) throw new ErroSala('Lugar inválido');
+    if (sala.lugares[lugar]) throw new ErroSala('Esse lugar está ocupado');
+    const usados = new Set(sala.lugares.map((l) => l?.apelido));
+    const nome = NOMES_ROBO.find((n) => !usados.has(n)) ?? `Robô ${lugar + 1}`;
+    sala.lugares[lugar] = { usuarioId: -(Math.floor(Math.random() * 1e12) + 1), apelido: nome, conectado: true, robo: true };
+    return this.mudou(sala);
+  }
+
+  tirarRobo(usuarioId: number, lugar: number): Sala {
+    const sala = this.salaDe(usuarioId);
+    if (!sala) throw new ErroSala('Você não está numa sala');
+    if (sala.donoId !== usuarioId) throw new ErroSala('Só quem criou a sala pode tirar robô');
+    if (sala.estado) throw new ErroSala('A partida já começou');
+    if (!sala.lugares[lugar]?.robo) throw new ErroSala('Não tem robô nesse lugar');
+    sala.lugares[lugar] = null;
+    return this.mudou(sala);
+  }
+
+  /** É a vez de um robô jogar? */
+  vezDeRobo(sala: Sala): boolean {
+    const e = sala.estado;
+    return !!e && (e.fase === 'comprar' || e.fase === 'jogar') && !!sala.lugares[e.vez]?.robo;
+  }
+
+  /** Faz o robô da vez dar uma jogada */
+  jogarRobo(codigo: string): Sala | null {
+    const sala = this.salas.get(codigo);
+    if (!sala || !this.vezDeRobo(sala)) return null;
+    const j = sala.estado!.vez;
+    const acao = decidirJogadaRobo(sala.estado!, j);
+    if (!acao) return null;
+    try {
+      return this.aplicar(sala, j, acao);
+    } catch (e) {
+      // Plano B para nunca travar a mesa: compra ou descarta qualquer carta que puder
+      console.error('Jogada do robô recusada:', (e as Error).message);
+      if (sala.estado!.fase === 'comprar') return this.aplicar(sala, j, { tipo: 'comprar' });
+      for (const c of sala.estado!.maos[j]) {
+        try {
+          return this.aplicar(sala, j, { tipo: 'descartar', carta: c.id });
+        } catch {
+          /* tenta a próxima */
+        }
+      }
+      return null;
+    }
+  }
+
   iniciar(usuarioId: number): Sala {
     const sala = this.salaDe(usuarioId);
     if (!sala) throw new ErroSala('Você não está numa sala');
@@ -235,7 +294,11 @@ export class GerenciadorSalas {
     if (!sala || !sala.estado) throw new ErroSala('Nenhuma partida em andamento');
     const j = this.lugarDe(sala, usuarioId);
     if (j === null) throw new ErroSala('Você não está nessa partida');
-    const e = sala.estado;
+    return this.aplicar(sala, j, acao);
+  }
+
+  private aplicar(sala: Sala, j: number, acao: Acao): Sala {
+    const e = sala.estado!;
 
     switch (acao?.tipo) {
       case 'comprar':
@@ -267,7 +330,11 @@ export class GerenciadorSalas {
         numJogadores: sala.numJogadores,
         pontos: [sala.estado.equipes[0].pontos, sala.estado.equipes[1].pontos],
         equipeVencedora: sala.estado.vencedor,
-        jogadores: sala.lugares.map((l, i) => ({ usuarioId: l!.usuarioId, apelido: l!.apelido, equipe: equipeDe(i) })),
+        // Só pessoas entram no ranking (robô não)
+        jogadores: sala.lugares
+          .map((l, i) => ({ l: l!, equipe: equipeDe(i) }))
+          .filter((x) => !x.l.robo)
+          .map((x) => ({ usuarioId: x.l.usuarioId, apelido: x.l.apelido, equipe: x.equipe })),
       });
     }
     return this.mudou(sala);

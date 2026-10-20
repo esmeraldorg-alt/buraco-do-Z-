@@ -52,22 +52,41 @@ export function Espera({ sala, usuario, emitir }: Props) {
       <section className="cartao">
         <h2>{sala.numJogadores === 2 ? 'Mano a mano' : 'Duplas'}</h2>
         {sala.numJogadores === 4 && <p className="sutil">Toque num lugar vazio para escolher sua dupla.</p>}
+        {souDono && <p className="sutil">Sem gente para jogar? Coloque robôs nos lugares vazios.</p>}
         <ul className={`lugares lugares-${sala.numJogadores}`}>
           {sala.lugares.map((l, i) => (
             <li key={i} className={`lugar ${sala.numJogadores === 4 ? (i % 2 === 0 ? 'dupla-a' : 'dupla-b') : ''}`}>
               <span className="sutil">{nomeLugar(i)}</span>
-              {l ? (
+              {l?.robo ? (
+                <div className="lugar-linha">
+                  <strong>🤖 {l.apelido}</strong>
+                  {souDono && (
+                    <button className="link" onClick={() => acao('sala:robo', { lugar: i, colocar: false })}>
+                      Tirar
+                    </button>
+                  )}
+                </div>
+              ) : l ? (
                 <strong>
                   {l.apelido}
                   {l.usuarioId === sala.donoId && ' ★'}
                   {l.usuarioId === usuario.id && ' (você)'}
                 </strong>
-              ) : sala.numJogadores === 2 ? (
-                <span className="vazio">Aguardando…</span>
               ) : (
-                <button className="link" onClick={() => acao('sala:lugar', { lugar: i })}>
-                  Sentar aqui
-                </button>
+                <div className="lugar-linha">
+                  {sala.numJogadores === 2 ? (
+                    <span className="vazio">Aguardando…</span>
+                  ) : (
+                    <button className="link" onClick={() => acao('sala:lugar', { lugar: i })}>
+                      Sentar aqui
+                    </button>
+                  )}
+                  {souDono && (
+                    <button className="botao botao-pequeno botao-secundario" onClick={() => acao('sala:robo', { lugar: i, colocar: true })}>
+                      🤖 Colocar robô
+                    </button>
+                  )}
+                </div>
               )}
             </li>
           ))}

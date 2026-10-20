@@ -161,6 +161,7 @@ select { width: auto; padding: 6px 10px; }
 .lugares { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
 .lugares-4 { grid-template-columns: 1fr 1fr; }
 .lugar { display: grid; gap: 2px; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); border-left: 4px solid transparent; }
+.lugar-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .lugar.dupla-a { border-left-color: var(--nos); }
 .lugar.dupla-b { border-left-color: var(--eles); }
 

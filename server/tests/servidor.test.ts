@@ -12,10 +12,10 @@ type Opcoes = Parameters<typeof criarServidor>[0];
 
 // Roda tudo com SQLite; e também com MongoDB se MONGODB_URI_TESTE estiver definida
 const bancos: [string, () => Opcoes][] = [
-  ['SQLite', () => ({ caminhoBanco: join(mkdtempSync(join(tmpdir(), 'buraco-')), 'teste.db') })],
+  ['SQLite', () => ({ caminhoBanco: join(mkdtempSync(join(tmpdir(), 'buraco-')), 'teste.db'), atrasoRoboMs: 15 })],
 ];
 if (process.env.MONGODB_URI_TESTE) {
-  bancos.push(['MongoDB', () => ({ caminhoBanco: ':memory:', mongoUri: process.env.MONGODB_URI_TESTE, mongoBanco: `buraco_teste_${Date.now()}` })]);
+  bancos.push(['MongoDB', () => ({ caminhoBanco: ':memory:', mongoUri: process.env.MONGODB_URI_TESTE, mongoBanco: `buraco_teste_${Date.now()}`, atrasoRoboMs: 15 })]);
 }
 
 describe.each(bancos)('servidor com %s', (_nome, criarOpcoes) => {
@@ -196,6 +196,60 @@ describe('sala e partida', () => {
     expect(v!.lugares.map((l) => l!.apelido)).toEqual(['P1', 'P3', 'P2', 'P4']);
     expect((await cs[0].emitir('sala:iniciar')).ok).toBe(true);
     cs.forEach((c) => c.socket.close());
+  });
+});
+
+describe('robôs', () => {
+  it('joga contra o robô: ele joga sozinho na vez dele', async () => {
+    const eu = await cliente('Solo');
+    const { codigo } = await eu.emitir('sala:criar', { numJogadores: 2 });
+    expect((await eu.emitir('sala:robo', { lugar: 1, colocar: true })).ok).toBe(true);
+    const v = await eu.esperar((v) => !!v?.lugares[1]?.robo);
+    expect(v!.lugares[1]!.apelido).toContain('Robô');
+    expect((await eu.emitir('sala:iniciar')).ok).toBe(true);
+    await eu.esperar((v) => v?.jogo?.vez === 0);
+    // Eu jogo três vezes; entre elas o robô tem que jogar
+    for (let rodada = 0; rodada < 3; rodada++) {
+      await eu.esperar((v) => v?.jogo?.vez === 0 && v.jogo.fase === 'comprar');
+      expect((await eu.emitir('jogo:acao', { tipo: 'comprar' })).ok).toBe(true);
+      const depois = await eu.esperar((v) => v?.jogo?.fase === 'jogar');
+      expect((await eu.emitir('jogo:acao', { tipo: 'descartar', carta: depois!.jogo!.minhaMao[0].id })).ok).toBe(true);
+      await eu.esperar((v) => v?.jogo?.vez === 1);
+    }
+    await eu.esperar((v) => v?.jogo?.vez === 0);
+    expect(srv.salas.obter(codigo).estado!.vez).toBe(0);
+    eu.socket.close();
+  });
+
+  it('só quem criou coloca robô, e robô não entra no ranking', async () => {
+    const dono = await cliente('Dona');
+    const outro = await cliente('Visita');
+    const { codigo } = await dono.emitir('sala:criar', { numJogadores: 4 });
+    await outro.emitir('sala:entrar', { codigo });
+    expect((await outro.emitir('sala:robo', { lugar: 2, colocar: true })).erro).toContain('Só quem criou');
+    await dono.emitir('sala:robo', { lugar: 2, colocar: true });
+    await dono.emitir('sala:robo', { lugar: 3, colocar: true });
+    expect((await dono.emitir('sala:iniciar')).ok).toBe(true);
+
+    // Fim de partida forçado: a dupla de Dona (lugares 0 e 2, com robô) vence
+    const sala = srv.salas.obter(codigo);
+    const e = sala.estado!;
+    e.vez = 0;
+    e.equipes[0].pontos = 2990;
+    e.equipes[0].pegouMorto = true;
+    e.mortos[0] = null;
+    e.equipes[0].jogos = [['3C', '4C', '5C', '6C', '7C', '8C', '9C'].map((t, i) => carta(t, 70 + i))];
+    e.maos[0] = [carta('KP', 80)];
+    e.fase = 'jogar';
+    expect((await dono.emitir('jogo:acao', { tipo: 'descartar', carta: 'KP-80' })).ok).toBe(true);
+    await dono.esperar((v) => v?.jogo?.fase === 'fimPartida');
+    await new Promise((r) => setTimeout(r, 50));
+    const ranking = (await (await fetch(url + '/api/ranking')).json()).ranking as { apelido: string }[];
+    expect(ranking.find((r) => r.apelido === 'Dona')).toMatchObject({ vitorias: 1, partidas: 1 });
+    expect(ranking.find((r) => r.apelido === 'Visita')).toMatchObject({ vitorias: 0, partidas: 1 });
+    expect(ranking.some((r) => r.apelido.startsWith('Robô'))).toBe(false);
+    dono.socket.close();
+    outro.socket.close();
   });
 });
 

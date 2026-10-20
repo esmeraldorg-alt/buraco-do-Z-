@@ -200,6 +200,29 @@ function verificarBatida(estado: Estado, jogador: number): 'nada' | 'morto' | 'f
   return 'fim';
 }
 
+/** Se o jogador descartar a última carta agora, essa batida seria aceita? */
+export function podeBater(estado: Estado, jogador: number): boolean {
+  const eq = equipeDe(jogador);
+  const equipe = estado.equipes[eq];
+  if (!equipe.pegouMorto && estado.mortos[eq]) {
+    return !estado.config.exigeCanastraParaMorto || temCanastra(equipe.jogos);
+  }
+  return temCanastraLimpa(equipe.jogos);
+}
+
+/**
+ * Impede ficar com uma carta só sem poder bater: no fim da vez é obrigatório descartar,
+ * e descartar a última carta é bater — então a pessoa ficaria travada.
+ */
+function garantirCartaParaDescarte(estado: Estado, jogador: number): void {
+  if (estado.fase !== 'jogar' || estado.vez !== jogador) return;
+  if (estado.maos[jogador].length === 1 && !podeBater(estado, jogador)) {
+    throw new ErroJogada(
+      'Fique com pelo menos 2 cartas na mão: para bater e encerrar a rodada, sua equipe precisa de uma canastra limpa',
+    );
+  }
+}
+
 function proximaVez(estado: Estado): void {
   estado.vez = (estado.vez + 1) % estado.numJogadores;
   estado.fase = 'comprar';
@@ -274,6 +297,7 @@ export function pegarLixo(estadoAtual: Estado, jogador: number, jogada: JogadaLi
   estado.fase = 'jogar';
 
   verificarBatida(estado, jogador);
+  garantirCartaParaDescarte(estado, jogador);
   return estado;
 }
 
@@ -284,6 +308,7 @@ export function baixarJogo(estadoAtual: Estado, jogador: number, ids: string[]):
   const cartas = tirarDaMao(estado.maos[jogador], ids);
   estado.equipes[equipeDe(jogador)].jogos.push(validarNovoJogo(cartas));
   verificarBatida(estado, jogador);
+  garantirCartaParaDescarte(estado, jogador);
   return estado;
 }
 
@@ -294,6 +319,7 @@ export function adicionarAoJogo(estadoAtual: Estado, jogador: number, indiceJogo
   const cartas = tirarDaMao(estado.maos[jogador], ids);
   aplicarAdicao(estado, equipeDe(jogador), indiceJogo, cartas);
   verificarBatida(estado, jogador);
+  garantirCartaParaDescarte(estado, jogador);
   return estado;
 }
 

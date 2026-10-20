@@ -20,6 +20,20 @@ export function Lobby({ usuario, abertas, emitir, aoSairDaConta }: Props) {
     if (!r.ok) setErro(r.erro ?? 'Algo deu errado');
   }
 
+  /** Atalho: cria a sala, coloca robô(s) e já começa */
+  async function contraRobo(numJogadores: 2 | 4) {
+    setErro(null);
+    const passos: [string, unknown][] = [
+      ['sala:criar', { numJogadores }],
+      ...Array.from({ length: numJogadores - 1 }, (_, k) => ['sala:robo', { lugar: k + 1, colocar: true }] as [string, unknown]),
+      ['sala:iniciar', {}],
+    ];
+    for (const [ev, dados] of passos) {
+      const r = await emitir(ev, dados);
+      if (!r.ok) return setErro(r.erro ?? 'Algo deu errado');
+    }
+  }
+
   function entrarPorCodigo(e: FormEvent) {
     e.preventDefault();
     if (codigo.trim()) void acao('sala:entrar', { codigo: codigo.trim() });
@@ -49,6 +63,20 @@ export function Lobby({ usuario, abertas, emitir, aoSairDaConta }: Props) {
           <button className="botao" onClick={() => acao('sala:criar', { numJogadores: 4 })}>
             Em duplas
             <small>4 jogadores</small>
+          </button>
+        </div>
+      </section>
+
+      <section className="cartao">
+        <h2>Jogar contra robô</h2>
+        <div className="botoes-lado">
+          <button className="botao botao-secundario" onClick={() => contraRobo(2)}>
+            🤖 Mano a mano
+            <small>você x 1 robô</small>
+          </button>
+          <button className="botao botao-secundario" onClick={() => contraRobo(4)}>
+            🤖 Duplas
+            <small>você + robô x 2 robôs</small>
           </button>
         </div>
       </section>

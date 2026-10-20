@@ -17,7 +17,10 @@ export async function criarServidor(opcoes: {
   mongoUri?: string;
   mongoBanco?: string;
   pastaCliente?: string;
+  /** Tempo entre as jogadas do robô (para dar tempo de ver) */
+  atrasoRoboMs?: number;
 }) {
+  const atrasoRobo = opcoes.atrasoRoboMs ?? 900;
   const db = await abrirArmazenamento({ mongoUri: opcoes.mongoUri, mongoBanco: opcoes.mongoBanco, caminhoSqlite: opcoes.caminhoBanco });
 
   // Guarda as salas com um pequeno atraso, juntando várias jogadas seguidas numa gravação só
@@ -133,6 +136,28 @@ export async function criarServidor(opcoes: {
     }
   }
 
+  // Robôs: quando é a vez de um, ele joga sozinho depois de um intervalo
+  const timersRobo = new Map<string, ReturnType<typeof setTimeout>>();
+  function agendarRobo(sala: Sala) {
+    if (timersRobo.has(sala.codigo) || !salas.vezDeRobo(sala)) return;
+    const espera = sala.estado!.fase === 'comprar' ? atrasoRobo : Math.round(atrasoRobo * 0.8);
+    timersRobo.set(
+      sala.codigo,
+      setTimeout(() => {
+        timersRobo.delete(sala.codigo);
+        try {
+          const s = salas.jogarRobo(sala.codigo);
+          if (s) {
+            void enviarEstado(s);
+            agendarRobo(s);
+          }
+        } catch (e) {
+          console.error('Erro na vez do robô:', e);
+        }
+      }, espera),
+    );
+  }
+
   function enviarSalasAbertas() {
     io.emit('salas:abertas', salas.abertas());
   }
@@ -145,6 +170,7 @@ export async function criarServidor(opcoes: {
       if (sala) {
         socket.join(sala$(sala.codigo));
         void enviarEstado(sala);
+        agendarRobo(sala);
       }
       enviarSalasAbertas();
       responder?.({ ok: true, codigo: sala ? sala.codigo : undefined });
@@ -181,6 +207,14 @@ export async function criarServidor(opcoes: {
       tratar(socket, () => salas.escolherLugar(usuario.id, Number(dados?.lugar)), responder),
     );
 
+    socket.on('sala:robo', (dados: { lugar: number; colocar: boolean }, responder: Resposta) =>
+      tratar(
+        socket,
+        () => (dados?.colocar ? salas.colocarRobo(usuario.id, Number(dados.lugar)) : salas.tirarRobo(usuario.id, Number(dados?.lugar))),
+        responder,
+      ),
+    );
+
     socket.on('sala:iniciar', (_d: unknown, responder: Resposta) => tratar(socket, () => salas.iniciar(usuario.id), responder));
 
     socket.on('sala:reiniciar', (_d: unknown, responder: Resposta) =>
@@ -214,8 +248,13 @@ export async function criarServidor(opcoes: {
   const limpeza = setInterval(() => salas.limpar(SEIS_HORAS), 30 * 60 * 1000);
   limpeza.unref();
 
+  // Mesas que voltaram depois de reiniciar: se era a vez de um robô, ele continua
+  for (const s of salas.salas.values()) agendarRobo(s);
+
   /** Grava o que estiver pendente e fecha tudo */
   async function encerrar() {
+    for (const t of timersRobo.values()) clearTimeout(t);
+    timersRobo.clear();
     for (const [codigo, t] of pendentes) {
       clearTimeout(t);
       const s = salas.salas.get(codigo);
