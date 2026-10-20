@@ -315,3 +315,7 @@ select { width: auto; padding: 6px 10px; }
 /* Na mesa o botão de som fica no canto do placar, longe das cartas */
 .mesa .placar { padding-right: 44px; }
 main.mesa ~ .botao-som { top: calc(14px + env(safe-area-inset-top)); bottom: auto; right: 10px; width: 36px; height: 36px; font-size: 1rem; }
+
+.link-menu { padding: 2px 0; font-size: 0.75rem; }
+.cartao-destaque { border-color: var(--ouro); background: rgba(232, 184, 74, 0.12); }
+.janela.centro .botoes-lado { margin-top: 14px; }

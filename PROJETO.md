@@ -15,6 +15,11 @@ Antes de abrir o jogo, aparece a mensagem:
 
 > Este jogo é para lembrar os velhos tempos em que Dil e Anderson jogavam o buraco aberto.
 
+## Botão Voltar
+- **Na sala ou na partida:** o Voltar do celular (ou o botão **← Menu** no placar) leva ao **menu principal**
+  - Se a partida estava no meio, o lugar fica guardado e o menu mostra **Voltar para a partida**
+- **No menu principal:** pergunta **"Quer sair do Buraco do Zé?"** (Não, continuar / Sim, sair)
+
 ## Som ambiente
 - Som de cassino (burburinho do salão, fichas tilintando e um sininho de vez em quando), gerado no próprio navegador — sem arquivo de áudio
 - Começa ao tocar em "Entrar no jogo" (regra dos navegadores: só toca depois de um toque)

@@ -8,9 +8,11 @@ interface Props {
   abertas: ResumoSala[];
   emitir: (ev: string, dados?: unknown) => Promise<Resposta>;
   aoSairDaConta: () => void;
+  partidaPendente?: string | null;
+  aoVoltarParaPartida?: () => void;
 }
 
-export function Lobby({ usuario, abertas, emitir, aoSairDaConta }: Props) {
+export function Lobby({ usuario, abertas, emitir, aoSairDaConta, partidaPendente, aoVoltarParaPartida }: Props) {
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
@@ -52,6 +54,16 @@ export function Lobby({ usuario, abertas, emitir, aoSairDaConta }: Props) {
           </button>
         </div>
       </header>
+
+      {partidaPendente && (
+        <section className="cartao cartao-destaque">
+          <h2>Partida em andamento</h2>
+          <p className="sutil">Você saiu da sala {partidaPendente} no meio do jogo. Seu lugar está guardado.</p>
+          <button className="botao botao-grande" onClick={aoVoltarParaPartida}>
+            Voltar para a partida
+          </button>
+        </section>
+      )}
 
       <section className="cartao">
         <h2>Nova partida</h2>

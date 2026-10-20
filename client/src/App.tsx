@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, lerToken, salvarToken, type Usuario } from './api';
 import { useConexao } from './conexao';
 import { Abertura } from './telas/Abertura';
@@ -42,6 +42,66 @@ export function App() {
   }, []);
 
   const { sala, abertas, conectado, pronto, emitir } = useConexao(usuario ? token : null, expirou);
+
+  // ---------- botão Voltar (celular / navegador) ----------
+  // Na sala ou na partida: volta ao menu principal. No menu: pergunta se quer sair.
+  const [confirmarSaida, setConfirmarSaida] = useState(false);
+  /** Partida que a pessoa deixou no meio (para poder voltar) */
+  const [partidaPendente, setPartidaPendente] = useState<string | null>(null);
+  const saindoRef = useRef(false);
+
+  const voltarAoMenu = useCallback(() => {
+    if (sala?.jogo && sala.jogo.fase !== 'fimPartida') setPartidaPendente(sala.codigo);
+    void emitir('sala:sair');
+  }, [sala, emitir]);
+
+  const voltarAoMenuRef = useRef(voltarAoMenu);
+  voltarAoMenuRef.current = voltarAoMenu;
+  const naSalaRef = useRef(false);
+  naSalaRef.current = !!sala;
+
+  useEffect(() => {
+    if (!viuAbertura) return;
+    // Entrada extra no histórico: o Voltar cai aqui em vez de sair do jogo
+    history.pushState({ buraco: true }, '');
+    const aoVoltar = () => {
+      if (saindoRef.current) return;
+      history.pushState({ buraco: true }, '');
+      if (naSalaRef.current) voltarAoMenuRef.current();
+      else setConfirmarSaida(true);
+    };
+    window.addEventListener('popstate', aoVoltar);
+    return () => window.removeEventListener('popstate', aoVoltar);
+  }, [viuAbertura]);
+
+  function sairDoJogo() {
+    setConfirmarSaida(false);
+    saindoRef.current = true;
+    desligarSom();
+    setSomLigado(somLigadoSalvo());
+    history.go(-2);
+    // Se não houver página anterior (app aberto direto), fica aqui e avisa
+    setTimeout(() => {
+      saindoRef.current = false;
+      try {
+        window.close();
+      } catch {
+        /* nada */
+      }
+      setAviso('Pode fechar o aplicativo');
+    }, 500);
+  }
+
+  async function voltarParaPartida() {
+    if (!partidaPendente) return;
+    const r = await emitir('sala:entrar', { codigo: partidaPendente });
+    setPartidaPendente(null);
+    if (!r.ok) setAviso(r.erro ?? 'Essa partida já acabou');
+  }
+
+  useEffect(() => {
+    if (sala) setPartidaPendente(null);
+  }, [sala]);
 
   // Confere o login guardado
   useEffect(() => {
@@ -91,9 +151,19 @@ export function App() {
       />
     );
   } else if (!pronto) tela = <div className="carregando">Conectando…</div>;
-  else if (sala && sala.jogo) tela = <Mesa sala={sala} usuario={usuario} emitir={emitir} />;
+  else if (sala && sala.jogo) tela = <Mesa sala={sala} usuario={usuario} emitir={emitir} aoMenu={voltarAoMenu} />;
   else if (sala) tela = <Espera sala={sala} usuario={usuario} emitir={emitir} />;
-  else tela = <Lobby usuario={usuario} abertas={abertas} emitir={emitir} aoSairDaConta={sairDaConta} />;
+  else
+    tela = (
+      <Lobby
+        usuario={usuario}
+        abertas={abertas}
+        emitir={emitir}
+        aoSairDaConta={sairDaConta}
+        partidaPendente={partidaPendente}
+        aoVoltarParaPartida={voltarParaPartida}
+      />
+    );
 
   return (
     <>
@@ -110,6 +180,22 @@ export function App() {
       )}
       {usuario && pronto && !conectado && <div className="faixa-offline">Sem conexão — tentando reconectar…</div>}
       {aviso && <div className="toast">{aviso}</div>}
+      {confirmarSaida && (
+        <div className="sobreposicao" onClick={() => setConfirmarSaida(false)}>
+          <div className="janela centro" role="alertdialog" aria-labelledby="titulo-sair" onClick={(e) => e.stopPropagation()}>
+            <h2 id="titulo-sair">Quer sair do Buraco do Zé?</h2>
+            <p className="sutil">Seu login fica salvo para a próxima vez.</p>
+            <div className="botoes-lado">
+              <button className="botao botao-secundario" onClick={() => setConfirmarSaida(false)} autoFocus>
+                Não, continuar
+              </button>
+              <button className="botao" onClick={sairDoJogo}>
+                Sim, sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

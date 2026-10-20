@@ -9,6 +9,7 @@ interface Props {
   sala: VisaoSala;
   usuario: Usuario;
   emitir: (ev: string, dados?: unknown) => Promise<Resposta>;
+  aoMenu: () => void;
 }
 
 const NOME_CANASTRA = { limpa: 'Limpa', suja: 'Suja', asAAs: 'Ás a Ás' } as const;
@@ -27,7 +28,7 @@ function montarJogadaLixo(topo: TCarta, selecionadas: TCarta[]) {
   return null;
 }
 
-export function Mesa({ sala, usuario, emitir }: Props) {
+export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
   const jogo = sala.jogo as VisaoJogador;
   const eu = jogo.eu;
   const n = sala.numJogadores;
@@ -111,6 +112,9 @@ export function Mesa({ sala, usuario, emitir }: Props) {
         <div className="placar-info">
           <span>Rodada {jogo.rodada + 1}</span>
           <span className="sutil">Sala {sala.codigo}</span>
+          <button className="link link-menu" onClick={aoMenu}>
+            ← Menu
+          </button>
         </div>
       </header>
 
