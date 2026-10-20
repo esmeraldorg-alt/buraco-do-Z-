@@ -5,3 +5,4 @@ dist/
 server/dados/
 *.db
 *.db-*
+state.json
