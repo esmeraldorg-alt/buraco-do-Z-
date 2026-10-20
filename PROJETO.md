@@ -26,11 +26,14 @@ Antes de abrir o jogo, aparece a mensagem:
   - Se a partida estava no meio, o lugar fica guardado e o menu mostra **Voltar para a partida**
 - **No menu principal:** pergunta **"Quer sair do Buraco do Zé?"** (Não, continuar / Sim, sair)
 
-## Som ambiente
-- Som de cassino (burburinho do salão, fichas tilintando e um sininho de vez em quando), gerado no próprio navegador — sem arquivo de áudio
-- Começa ao tocar em "Entrar no jogo" (regra dos navegadores: só toca depois de um toque)
-- Botão 🔊/🔇 para ligar/desligar (na mesa fica no canto do placar); a escolha fica salva no aparelho
-- Pausa sozinho quando o app vai para segundo plano
+## Músicas
+- Arquivos em `client/public/musica/` (enviados pelo usuário, comprimidos para 112 kbps):
+  - `menu.mp3` — "We Will Empty This Casino" (viktoryuriev): toca na **tela inicial, login, menu e sala de espera**, em loop
+  - `jogo-1.mp3` — "Casino Music" (sigmamusicart) e `jogo-2.mp3` — "Casino" (kulakovka): tocam **durante a partida**, uma depois da outra
+- Troca de música com fade ao entrar/sair da partida
+- No app Android a música começa sozinha; no navegador começa no primeiro toque na tela (regra dos navegadores)
+- Botão 🔊/🔇 liga/desliga (escolha salva no aparelho); pausa quando o app vai para segundo plano
+- O som de cassino gerado pelo navegador (burburinho/fichas) foi removido
 
 ## Robôs
 - Dá para jogar contra robôs: no lobby, **Jogar contra robô** (mano a mano: você x 1 robô; duplas: você + robô x 2 robôs)
@@ -183,5 +186,5 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 4. [x] Placar e fim de partida
 5. [ ] Deploy web (Render + MongoDB — configuração pronta, falta criar o serviço)
 6. [x] Robôs para jogar sozinho ou completar a mesa
-7. [x] Som ambiente de cassino
+7. [x] Músicas de cassino (menu e partida)
 8. [x] App Android (mesmo esquema do dominó)

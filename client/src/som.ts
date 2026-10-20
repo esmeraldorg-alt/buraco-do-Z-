@@ -1,12 +1,23 @@
-// Som ambiente de cassino, gerado no próprio navegador (Web Audio) — sem baixar arquivos.
-// Burburinho de salão + fichas tilintando + um sino de máquina de vez em quando.
+// Músicas do jogo
+// - Telas de menu (abertura, login, lobby, sala de espera): "menu.mp3" em loop
+// - Durante a partida: "jogo-1.mp3" e "jogo-2.mp3" se alternando
+// Troca de música com fade (sobe/desce o volume devagar).
 
 const CHAVE = 'buraco-do-ze:som';
+const VOLUME = 0.55;
 
-let ctx: AudioContext | null = null;
-let mestre: GainNode | null = null;
-let timers: ReturnType<typeof setTimeout>[] = [];
-let tocando = false;
+export type Cena = 'menu' | 'jogo';
+
+const FAIXAS: Record<Cena, string[]> = {
+  menu: ['/musica/menu.mp3'],
+  jogo: ['/musica/jogo-1.mp3', '/musica/jogo-2.mp3'],
+};
+
+let ligado = somLigadoSalvo();
+let cenaAtual: Cena = 'menu';
+let atual: HTMLAudioElement | null = null;
+const indiceFaixa: Record<Cena, number> = { menu: 0, jogo: 0 };
+let destravado = false;
 
 export function somLigadoSalvo(): boolean {
   try {
@@ -16,166 +27,114 @@ export function somLigadoSalvo(): boolean {
   }
 }
 
-function salvar(ligado: boolean) {
+function salvar(v: boolean) {
   try {
-    localStorage.setItem(CHAVE, ligado ? 'ligado' : 'desligado');
+    localStorage.setItem(CHAVE, v ? 'ligado' : 'desligado');
   } catch {
     /* sem armazenamento */
   }
 }
 
-/** Ruído rosado em loop (base do burburinho) */
-function criarRuido(c: AudioContext): AudioBufferSourceNode {
-  const segundos = 4;
-  const buf = c.createBuffer(2, c.sampleRate * segundos, c.sampleRate);
-  for (let canal = 0; canal < 2; canal++) {
-    const d = buf.getChannelData(canal);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-    for (let i = 0; i < d.length; i++) {
-      const w = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + w * 0.0555179;
-      b1 = 0.99332 * b1 + w * 0.0750759;
-      b2 = 0.969 * b2 + w * 0.153852;
-      b3 = 0.8665 * b3 + w * 0.3104856;
-      b4 = 0.55 * b4 + w * 0.5329522;
-      b5 = -0.7616 * b5 - w * 0.016898;
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
-      b6 = w * 0.115926;
+/** Sobe ou desce o volume aos poucos; no fim chama `pronto` */
+function fade(audio: HTMLAudioElement, alvo: number, ms: number, pronto?: () => void) {
+  const passos = 20;
+  const inicio = audio.volume;
+  let i = 0;
+  const t = setInterval(() => {
+    i++;
+    audio.volume = Math.max(0, Math.min(1, inicio + ((alvo - inicio) * i) / passos));
+    if (i >= passos) {
+      clearInterval(t);
+      pronto?.();
     }
-  }
-  const src = c.createBufferSource();
-  src.buffer = buf;
-  src.loop = true;
-  return src;
+  }, ms / passos);
 }
 
-/** Burburinho de gente conversando: ruído filtrado na faixa da voz, com volume ondulando */
-function iniciarBurburinho(c: AudioContext, saida: AudioNode) {
-  for (const [freq, q, vol, lfoHz] of [
-    [420, 0.8, 0.5, 0.13],
-    [900, 1.2, 0.3, 0.21],
-    [1600, 1.5, 0.12, 0.31],
-  ] as const) {
-    const ruido = criarRuido(c);
-    const filtro = c.createBiquadFilter();
-    filtro.type = 'bandpass';
-    filtro.frequency.value = freq;
-    filtro.Q.value = q;
-    const ganho = c.createGain();
-    ganho.gain.value = vol;
-    // Oscila o volume devagar, como conversas indo e vindo
-    const lfo = c.createOscillator();
-    lfo.frequency.value = lfoHz;
-    const lfoGanho = c.createGain();
-    lfoGanho.gain.value = vol * 0.45;
-    lfo.connect(lfoGanho).connect(ganho.gain);
-    ruido.connect(filtro).connect(ganho).connect(saida);
-    ruido.start(c.currentTime + Math.random());
-    lfo.start();
+function criarAudio(cena: Cena): HTMLAudioElement {
+  const lista = FAIXAS[cena];
+  const a = new Audio(lista[indiceFaixa[cena] % lista.length]);
+  a.preload = 'auto';
+  a.volume = 0;
+  if (lista.length === 1) a.loop = true;
+  else {
+    // Acabou uma faixa do jogo: passa para a próxima
+    a.addEventListener('ended', () => {
+      if (atual !== a) return;
+      indiceFaixa[cena] = (indiceFaixa[cena] + 1) % lista.length;
+      atual = null;
+      tocar(cena);
+    });
   }
+  return a;
 }
 
-/** Tilintar de fichas: 2 a 5 batidinhas metálicas rápidas */
-function fichas(c: AudioContext, saida: AudioNode) {
-  const batidas = 2 + Math.floor(Math.random() * 4);
-  const pan = c.createStereoPanner();
-  pan.pan.value = Math.random() * 1.6 - 0.8;
-  pan.connect(saida);
-  let t = c.currentTime + 0.02;
-  for (let i = 0; i < batidas; i++) {
-    for (const mult of [1, 2.76, 5.4]) {
-      const osc = c.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = (2600 + Math.random() * 900) * (mult === 1 ? 1 : mult / 2.2);
-      const g = c.createGain();
-      const vol = (mult === 1 ? 0.09 : 0.035) * (0.6 + Math.random() * 0.4);
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(vol, t + 0.003);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09 + Math.random() * 0.06);
-      osc.connect(g).connect(pan);
-      osc.start(t);
-      osc.stop(t + 0.2);
-    }
-    t += 0.05 + Math.random() * 0.09;
-  }
+function tocar(cena: Cena) {
+  if (!ligado) return;
+  const novo = criarAudio(cena);
+  atual = novo;
+  novo
+    .play()
+    .then(() => {
+      destravado = true;
+      fade(novo, VOLUME, 1200);
+    })
+    .catch(() => {
+      // O navegador bloqueou (ainda não houve toque na tela): tenta de novo no primeiro toque
+      if (atual === novo) atual = null;
+    });
 }
 
-/** Sininho distante de máquina caça-níquel */
-function sino(c: AudioContext, saida: AudioNode) {
-  const notas = [1318.5, 1568, 2093]; // mi, sol, dó
-  const pan = c.createStereoPanner();
-  pan.pan.value = Math.random() * 1.4 - 0.7;
-  pan.connect(saida);
-  notas.forEach((f, i) => {
-    const t = c.currentTime + i * 0.12;
-    const osc = c.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.value = f;
-    const g = c.createGain();
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.025, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-    osc.connect(g).connect(pan);
-    osc.start(t);
-    osc.stop(t + 0.8);
+function pararAtual(ms = 800) {
+  const velho = atual;
+  atual = null;
+  if (!velho) return;
+  fade(velho, 0, ms, () => {
+    velho.pause();
+    velho.src = '';
   });
 }
 
-function agendar(fn: () => void, minMs: number, maxMs: number) {
-  const proximo = () => {
-    const t = setTimeout(() => {
-      if (!tocando) return;
-      fn();
-      proximo();
-    }, minMs + Math.random() * (maxMs - minMs));
-    timers.push(t);
-  };
-  proximo();
+/** Diz qual música deve tocar agora (chamado quando a tela muda) */
+export function definirCena(cena: Cena): void {
+  if (cena === cenaAtual && atual) return;
+  const mudou = cena !== cenaAtual;
+  cenaAtual = cena;
+  if (!ligado) return;
+  if (mudou || !atual) {
+    pararAtual();
+    tocar(cena);
+  }
 }
 
-/** Liga o som (precisa ser chamado depois de um toque na tela, regra dos navegadores) */
 export function ligarSom(): void {
+  ligado = true;
   salvar(true);
-  if (tocando) return;
-  try {
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    if (!ctx) {
-      ctx = new Ctx();
-      mestre = ctx.createGain();
-      mestre.gain.value = 0;
-      mestre.connect(ctx.destination);
-      iniciarBurburinho(ctx, mestre);
-    }
-    void ctx.resume();
-    tocando = true;
-    mestre!.gain.cancelScheduledValues(ctx.currentTime);
-    mestre!.gain.setTargetAtTime(0.35, ctx.currentTime, 0.8); // entra suave
-    agendar(() => fichas(ctx!, mestre!), 1500, 5000);
-    agendar(() => sino(ctx!, mestre!), 12000, 30000);
-  } catch {
-    /* navegador sem áudio */
-  }
+  if (!atual) tocar(cenaAtual);
 }
 
 export function desligarSom(): void {
+  ligado = false;
   salvar(false);
-  tocando = false;
-  timers.forEach(clearTimeout);
-  timers = [];
-  if (ctx && mestre) {
-    mestre.gain.cancelScheduledValues(ctx.currentTime);
-    mestre.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
-    const c = ctx;
-    setTimeout(() => !tocando && void c.suspend(), 800);
-  }
+  pararAtual(400);
 }
 
-// Pausa quando o app vai para segundo plano (economiza bateria) e volta depois
+/** Para a música sem mudar a preferência (ao sair do jogo) */
+export function pausarSom(): void {
+  pararAtual(300);
+}
+
+/** Navegadores só deixam tocar depois de um toque: no primeiro toque, começa a música */
 if (typeof document !== 'undefined') {
+  const destravar = () => {
+    if (!destravado && ligado && !atual) tocar(cenaAtual);
+  };
+  document.addEventListener('pointerdown', destravar, { capture: true });
+  document.addEventListener('keydown', destravar, { capture: true });
+
+  // Pausa quando o app vai para segundo plano e volta depois
   document.addEventListener('visibilitychange', () => {
-    if (!ctx) return;
-    if (document.hidden) void ctx.suspend();
-    else if (tocando) void ctx.resume();
+    if (!atual) return;
+    if (document.hidden) atual.pause();
+    else if (ligado) void atual.play().catch(() => {});
   });
 }

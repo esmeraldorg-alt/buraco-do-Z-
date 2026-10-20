@@ -6,7 +6,7 @@ import { Entrar } from './telas/Entrar';
 import { Lobby } from './telas/Lobby';
 import { Espera } from './telas/Espera';
 import { Mesa } from './telas/Mesa';
-import { desligarSom, ligarSom, somLigadoSalvo } from './som';
+import { definirCena, desligarSom, ligarSom, pausarSom, somLigadoSalvo } from './som';
 
 /** Código de sala vindo do link compartilhado (?sala=ABCDE) */
 function salaDoLink(): string | null {
@@ -77,8 +77,7 @@ export function App() {
   function sairDoJogo() {
     setConfirmarSaida(false);
     saindoRef.current = true;
-    desligarSom();
-    setSomLigado(somLigadoSalvo());
+    pausarSom();
     // Dentro do app Android: fecha o app de verdade
     const app = (window as unknown as { BuracoApp?: { sair: () => void } }).BuracoApp;
     if (app) {
@@ -133,13 +132,18 @@ export function App() {
     return () => clearTimeout(t);
   }, [aviso]);
 
+  // Música: na partida toca a do jogo; no resto (abertura, menu, sala de espera) a do menu
+  const naPartida = !!(viuAbertura && usuario && pronto && sala?.jogo);
+  useEffect(() => {
+    definirCena(naPartida ? 'jogo' : 'menu');
+  }, [naPartida]);
+
   let tela;
   if (!viuAbertura) {
     tela = (
       <Abertura
         aoEntrar={() => {
           setViuAbertura(true);
-          if (somLigado) ligarSom(); // o navegador só deixa tocar depois de um toque
         }}
       />
     );
@@ -174,7 +178,7 @@ export function App() {
   return (
     <>
       {tela}
-      {viuAbertura && (
+      {(
         <button
           className="botao-som"
           onClick={alternarSom}
