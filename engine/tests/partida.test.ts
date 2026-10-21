@@ -320,6 +320,64 @@ describe('batidas e morto', () => {
   });
 });
 
+describe('mortos viram monte', () => {
+  it('meu morto virou monte, mas ainda posso bater e pegar o outro', () => {
+    let e = cenario(2, (e) => {
+      e.monte = [];
+    });
+    e = comprarMonte(e, 0); // o morto 0 vira monte
+    expect(e.destinoMortos).toEqual(['monte', null]);
+    const ultima = cs('KP');
+    e.equipes[0].jogos = [cs('3P', '4P', '5P')];
+    e.maos[0] = [...ultima];
+    e.fase = 'jogar';
+    const outro = e.mortos[1]!;
+    e = descartar(e, 0, ultima[0].id);
+    expect(e.equipes[0].pegouMorto).toBe(true);
+    expect(ids(e.maos[0])).toEqual(ids(outro));
+    expect(e.destinoMortos).toEqual(['monte', 0]);
+  });
+
+  it('os dois mortos viraram monte: só bate com canastra limpa', () => {
+    const ultima = cs('KP');
+    const e = cenario(2, (e) => {
+      e.mortos = [null, null];
+      e.destinoMortos = ['monte', 'monte'];
+      e.equipes[0].jogos = [canastraSuja()];
+      e.maos[0] = [...ultima];
+      e.fase = 'jogar';
+    });
+    expect(() => descartar(e, 0, ultima[0].id)).toThrow('Os mortos viraram monte');
+  });
+
+  it('os dois mortos viraram monte: com canastra limpa bate e encerra', () => {
+    const ultima = cs('KP');
+    let e = cenario(2, (e) => {
+      e.mortos = [null, null];
+      e.destinoMortos = ['monte', 'monte'];
+      e.equipes[0].jogos = [canastraLimpa()];
+      e.maos[0] = [...ultima];
+      e.fase = 'jogar';
+    });
+    e = descartar(e, 0, ultima[0].id);
+    expect(e.fase).toBe('fimRodada');
+    expect(e.historico[0].equipes[0].bonusBatida).toBe(100);
+  });
+
+  it('em duplas, a outra dupla pegou um morto e o outro virou monte: só limpa', () => {
+    const ultima = cs('KP');
+    const e = cenario(4, (e) => {
+      e.mortos = [null, null];
+      e.destinoMortos = [1, 'monte'];
+      e.equipes[1].pegouMorto = true;
+      e.equipes[0].jogos = [canastraSuja()];
+      e.maos[0] = [...ultima];
+      e.fase = 'jogar';
+    });
+    expect(() => descartar(e, 0, ultima[0].id)).toThrow('canastra limpa');
+  });
+});
+
 describe('monte acabando', () => {
   it('morto não pego vira monte', () => {
     let e = cenario(2, (e) => {

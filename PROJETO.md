@@ -137,13 +137,16 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 - Vulnerável, para pegar o lixo, precisa descer na mesa pelo menos **75 pontos em cartas da mão** na mesma jogada (o par conta; a carta do lixo não conta)
 
 ### Morto
-- **Dois montes de 11 cartas** — um para cada equipe (no mano a mano, cada jogador é uma equipe)
-- Em duplas, **qualquer um dos parceiros** pode bater e pegar o morto da dupla
+- **Dois montes de 11 cartas**, para as **duas primeiras equipes que baterem** (não são "de" ninguém)
+- Cada equipe pega no máximo um morto; em duplas, **qualquer um dos parceiros** pode bater e pegar
 - Quem não pega o morto **não perde pontos** por isso
-- Se o monte acabar, um morto que ninguém pegou vira monte; se não houver mais, a rodada termina
+- Quando o **monte acaba, um morto vira monte**; quem ainda não pegou morto pode bater e pegar o que sobrou
+- Se os **dois mortos viraram monte** (ou o outro foi pego e o que sobrou virou monte), quem não pegou morto **só bate com canastra limpa**
+- Se o monte acabar e não houver mais morto, a rodada termina
+- Na mesa, cada morto mostra o que aconteceu: na mesa / "Virou monte" / quem pegou
 
 ### Batidas
-1. **Primeira batida** (zerar a mão): **não precisa de canastra** → pega o morto
+1. **Primeira batida** (zerar a mão): **não precisa de canastra** → pega um morto que ainda esteja na mesa
    - Bateu descartando: pega o morto e espera a próxima vez
    - Bateu baixando tudo: pega o morto e continua jogando
 2. **Segunda batida** (encerra a rodada): só se tiver **canastra limpa na mesa** → **+100 pontos**

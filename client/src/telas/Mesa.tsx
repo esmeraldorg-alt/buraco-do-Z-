@@ -129,16 +129,18 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
     const c = analisarJogo(j).canastra;
     return c === 'limpa' || c === 'asAAs';
   });
-  const podeBater = (!minhaEq.pegouMorto && jogo.mortoDisponivel[minhaEquipe]) || temLimpa;
+  // Os mortos são de quem bater primeiro: se ainda tem algum na mesa e a equipe não pegou, pode bater
+  const sobraMorto = jogo.mortoDisponivel.some(Boolean);
+  const podeBater = (!minhaEq.pegouMorto && sobraMorto) || temLimpa;
 
   let dica: string;
   if (jogo.fase === 'fimRodada' || jogo.fase === 'fimPartida') dica = 'Rodada encerrada';
   else if (!minhaVez) dica = `Vez de ${nomeJogador(jogo.vez)}`;
   else if (jogo.fase === 'comprar') dica = 'Sua vez: compre do monte, ou selecione o par e pegue o lixo';
   else if (!podeBater && mao.length <= 5)
-    dica = jogo.equipes[minhaEquipe].pegouMorto
+    dica = minhaEq.pegouMorto
       ? 'Para bater (zerar a mão) sua equipe precisa de uma canastra LIMPA. Fique com pelo menos 2 cartas e descarte uma.'
-      : 'Baixe jogos, toque num jogo seu para encaixar cartas e descarte para passar a vez';
+      : 'Os mortos viraram monte: para bater, sua equipe precisa de uma canastra LIMPA. Fique com pelo menos 2 cartas.';
   else dica = 'Baixe jogos, toque num jogo seu para encaixar cartas e descarte para passar a vez';
 
   return (
@@ -202,12 +204,22 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
         </button>
 
         <div className="mortos">
-          {[minhaEquipe, outraEquipe].map((eq) => (
-            <div key={eq} className={`morto ${jogo.mortoDisponivel[eq] ? '' : 'pego'}`}>
-              {jogo.mortoDisponivel[eq] ? <VersoCarta tamanho="mini" /> : <span className="morto-vazio">✓</span>}
-              <span className="rotulo">Morto {eq === minhaEquipe ? (n === 2 ? 'seu' : 'nosso') : n === 2 ? 'dele' : 'deles'}</span>
-            </div>
-          ))}
+          {[0, 1].map((i) => {
+            const destino = jogo.destinoMortos?.[i] ?? (jogo.mortoDisponivel[i] ? null : 'monte');
+            const quem = (eq: number) => (eq === minhaEquipe ? (n === 2 ? 'Você pegou' : 'Nós pegamos') : n === 2 ? 'Ele pegou' : 'Eles pegaram');
+            return (
+              <div key={i} className={`morto ${destino === null ? '' : 'pego'}`}>
+                {destino === null ? (
+                  <VersoCarta tamanho="mini" />
+                ) : (
+                  <span className="morto-vazio">{destino === 'monte' ? '↻' : '✓'}</span>
+                )}
+                <span className="rotulo">
+                  {destino === null ? `Morto ${i + 1}` : destino === 'monte' ? 'Virou monte' : quem(destino)}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         <button

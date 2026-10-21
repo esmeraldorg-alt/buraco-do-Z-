@@ -56,8 +56,13 @@ export interface Estado {
   maos: Carta[][];
   monte: Carta[];
   lixo: Carta[];
-  /** Um morto por equipe; null = já foi pego ou virou monte */
+  /**
+   * Dois mortos, para as duas primeiras equipes que baterem (não são "de" ninguém).
+   * null = já foi pego ou virou monte.
+   */
   mortos: (Carta[] | null)[];
+  /** O que aconteceu com cada morto: null = na mesa; 'monte' = virou monte; número = equipe que pegou */
+  destinoMortos?: (null | 'monte' | number)[];
   equipes: Equipe[];
   historico: ResultadoRodada[];
   vencedor: number | null;
@@ -114,6 +119,7 @@ function distribuir(estado: Estado): void {
   estado.maos = [];
   for (let j = 0; j < estado.numJogadores; j++) estado.maos.push(baralho.splice(0, cartasPorJogador));
   estado.mortos = [baralho.splice(0, cartasPorMorto), baralho.splice(0, cartasPorMorto)];
+  estado.destinoMortos = [null, null];
   estado.lixo = [];
   estado.monte = baralho;
   estado.equipes.forEach((e) => {
@@ -172,29 +178,42 @@ function aplicarAdicao(estado: Estado, equipe: number, indiceJogo: number, carta
   estado.equipes[equipe].jogos[indiceJogo] = a.ordenadas;
 }
 
+/** Qual morto a equipe pegaria se batesse agora (-1 = nenhum: já pegou, ou os mortos viraram monte) */
+function mortoParaPegar(estado: Estado, eq: number): number {
+  if (estado.equipes[eq].pegouMorto) return -1;
+  if (estado.mortos[eq]) return eq; // prefere o do "seu lado", mas qualquer um serve
+  return estado.mortos.findIndex((m) => m !== null);
+}
+
 /**
  * Chamado sempre que a mão do jogador pode ter ficado vazia.
- * - Primeira batida: pega o morto (com canastra, suja serve, se configurado)
- * - Segunda batida: precisa de canastra limpa e encerra a rodada
+ * - Primeira batida da equipe: pega um morto que ainda esteja na mesa (não precisa de canastra)
+ * - Se a equipe já pegou morto, ou se os dois mortos viraram monte: precisa de canastra limpa e encerra a rodada
  */
 function verificarBatida(estado: Estado, jogador: number): 'nada' | 'morto' | 'fim' {
   if (estado.maos[jogador].length > 0) return 'nada';
   const eq = equipeDe(jogador);
   const equipe = estado.equipes[eq];
-  const morto = estado.mortos[eq];
+  const i = mortoParaPegar(estado, eq);
 
-  if (!equipe.pegouMorto && morto) {
+  if (i >= 0) {
     if (estado.config.exigeCanastraParaMorto && !temCanastra(equipe.jogos)) {
       throw new ErroJogada('Para bater e pegar o morto, sua equipe precisa ter uma canastra');
     }
-    estado.maos[jogador] = morto;
-    estado.mortos[eq] = null;
+    estado.maos[jogador] = estado.mortos[i]!;
+    estado.mortos[i] = null;
+    estado.destinoMortos ??= [null, null];
+    estado.destinoMortos[i] = eq;
     equipe.pegouMorto = true;
     return 'morto';
   }
 
   if (!temCanastraLimpa(equipe.jogos)) {
-    throw new ErroJogada('Para bater e encerrar a rodada, sua equipe precisa ter uma canastra limpa');
+    throw new ErroJogada(
+      equipe.pegouMorto
+        ? 'Para bater e encerrar a rodada, sua equipe precisa ter uma canastra limpa'
+        : 'Os mortos viraram monte: para bater, sua equipe precisa ter uma canastra limpa',
+    );
   }
   fecharRodada(estado, eq);
   return 'fim';
@@ -204,7 +223,7 @@ function verificarBatida(estado: Estado, jogador: number): 'nada' | 'morto' | 'f
 export function podeBater(estado: Estado, jogador: number): boolean {
   const eq = equipeDe(jogador);
   const equipe = estado.equipes[eq];
-  if (!equipe.pegouMorto && estado.mortos[eq]) {
+  if (mortoParaPegar(estado, eq) >= 0) {
     return !estado.config.exigeCanastraParaMorto || temCanastra(equipe.jogos);
   }
   return temCanastraLimpa(equipe.jogos);
@@ -236,6 +255,7 @@ export function comprarMonte(estadoAtual: Estado, jogador: number): Estado {
   conferirVez(estado, jogador, 'comprar');
 
   if (estado.monte.length === 0) {
+    // Acabou o monte: um morto vira monte. Se não houver mais morto, a rodada acaba.
     const i = estado.mortos.findIndex((m) => m !== null);
     if (i < 0) {
       fecharRodada(estado, null);
@@ -243,6 +263,8 @@ export function comprarMonte(estadoAtual: Estado, jogador: number): Estado {
     }
     estado.monte = estado.mortos[i]!;
     estado.mortos[i] = null;
+    estado.destinoMortos ??= [null, null];
+    estado.destinoMortos[i] = 'monte';
   }
 
   estado.maos[jogador].push(estado.monte.pop()!);
@@ -369,6 +391,8 @@ export interface VisaoJogador {
   lixo: Carta[];
   cartasNoMonte: number;
   mortoDisponivel: boolean[];
+  /** null = na mesa; 'monte' = virou monte; número = equipe que pegou */
+  destinoMortos: (null | 'monte' | number)[];
   equipes: {
     pontos: number;
     jogos: Carta[][];
@@ -394,6 +418,7 @@ export function visaoDoJogador(estado: Estado, jogador: number): VisaoJogador {
     lixo: structuredClone(estado.lixo),
     cartasNoMonte: estado.monte.length,
     mortoDisponivel: estado.mortos.map((m) => m !== null),
+    destinoMortos: estado.destinoMortos ?? estado.mortos.map((m) => (m ? null : 'monte')),
     equipes: estado.equipes.map((e, i) => {
       // Depois que a rodada fecha, os pontos já foram somados ao total — não conta duas vezes
       const emJogo = estado.fase === 'comprar' || estado.fase === 'jogar';
