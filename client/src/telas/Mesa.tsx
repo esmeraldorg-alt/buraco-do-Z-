@@ -68,7 +68,7 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
 
   useEffect(() => {
     if (!erro) return;
-    const t = setTimeout(() => setErro(null), 3500);
+    const t = setTimeout(() => setErro(null), 6000);
     return () => clearTimeout(t);
   }, [erro]);
 
@@ -101,18 +101,44 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
     void jogar({ tipo: 'lixo', ...jogada });
   }
 
+  /** Avisa antes de mandar uma jogada que deixaria a mão vazia ou com 1 carta sem poder bater */
+  function bloqueiaBatida(quantasSaem: number, descartando = false): boolean {
+    const sobram = mao.length - quantasSaem;
+    if (podeBater) return false;
+    if (sobram === 0 || (!descartando && sobram === 1)) {
+      setErro(
+        'Ainda não dá para bater: sua equipe precisa de uma canastra limpa. Baixe deixando pelo menos 2 cartas na mão, ou descarte uma carta.',
+      );
+      return true;
+    }
+    return false;
+  }
+
   function tocarJogo(indice: number) {
     if (!minhaVez || jogo.fase !== 'jogar') return;
     if (sel.length === 0) return setErro('Selecione cartas da mão para colocar nesse jogo');
+    if (bloqueiaBatida(sel.length)) return;
     void jogar({ tipo: 'adicionar', jogo: indice, cartas: sel });
   }
 
   const outros = Array.from({ length: n - 1 }, (_, k) => (eu + k + 1) % n);
 
+  // Pode zerar a mão agora? 1ª batida (pegar o morto) sempre pode; a 2ª precisa de canastra limpa
+  const minhaEq = jogo.equipes[minhaEquipe];
+  const temLimpa = minhaEq.jogos.some((j) => {
+    const c = analisarJogo(j).canastra;
+    return c === 'limpa' || c === 'asAAs';
+  });
+  const podeBater = (!minhaEq.pegouMorto && jogo.mortoDisponivel[minhaEquipe]) || temLimpa;
+
   let dica: string;
   if (jogo.fase === 'fimRodada' || jogo.fase === 'fimPartida') dica = 'Rodada encerrada';
   else if (!minhaVez) dica = `Vez de ${nomeJogador(jogo.vez)}`;
   else if (jogo.fase === 'comprar') dica = 'Sua vez: compre do monte, ou selecione o par e pegue o lixo';
+  else if (!podeBater && mao.length <= 5)
+    dica = jogo.equipes[minhaEquipe].pegouMorto
+      ? 'Para bater (zerar a mão) sua equipe precisa de uma canastra LIMPA. Fique com pelo menos 2 cartas e descarte uma.'
+      : 'Baixe jogos, toque num jogo seu para encaixar cartas e descarte para passar a vez';
   else dica = 'Baixe jogos, toque num jogo seu para encaixar cartas e descarte para passar a vez';
 
   return (
@@ -242,14 +268,14 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
           <>
             <button
               className="botao"
-              onClick={() => jogar({ tipo: 'baixar', cartas: sel })}
+              onClick={() => !bloqueiaBatida(sel.length) && jogar({ tipo: 'baixar', cartas: sel })}
               disabled={ocupado || sel.length < 3}
             >
               Baixar jogo
             </button>
             <button
               className="botao botao-secundario"
-              onClick={() => jogar({ tipo: 'descartar', carta: sel[0] })}
+              onClick={() => !bloqueiaBatida(1, true) && jogar({ tipo: 'descartar', carta: sel[0] })}
               disabled={ocupado || sel.length !== 1}
             >
               Descartar
@@ -263,7 +289,11 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
         )}
       </div>
 
-      {erro && <div className="toast toast-erro">{erro}</div>}
+      {erro && (
+        <div className="toast toast-erro" role="alert" onClick={() => setErro(null)}>
+          {erro}
+        </div>
+      )}
 
       {verLixo && (
         <div className="sobreposicao" onClick={() => setVerLixo(false)}>

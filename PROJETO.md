@@ -21,6 +21,11 @@ Antes de abrir o jogo, aparece a mensagem:
 - **Ordem da mão:** botão **↕** acima da mão troca entre **Por naipe** (junta o mesmo naipe, bom para ver sequências), **Por número** (mistura os naipes) e **Como veio** (sem organizar); a escolha fica salva no aparelho
 - O embaralhamento é aleatório a cada rodada (testado em 3.000 partidas: em média 5 a 6 cartas vermelhas em 11)
 
+## Avisos na hora de bater
+- Se a equipe já pegou o morto e ainda **não tem canastra limpa**, a dica da mesa avisa: "Para bater sua equipe precisa de uma canastra LIMPA. Fique com pelo menos 2 cartas e descarte uma."
+- Ao tentar baixar/encaixar/descartar deixando a mão vazia (ou com 1 carta) sem poder bater, aparece um aviso explicando — o aviso fica 6 segundos (toque para fechar)
+- Os botões (Baixar, Descartar…) ficam sempre visíveis no rodapé, mesmo com muitos jogos na mesa
+
 ## Botão Voltar
 - **Na sala ou na partida:** o Voltar do celular (ou o botão **← Menu** no placar) leva ao **menu principal**
   - Se a partida estava no meio, o lugar fica guardado e o menu mostra **Voltar para a partida**
