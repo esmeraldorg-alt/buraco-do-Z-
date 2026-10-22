@@ -134,7 +134,12 @@ Produção: `npm run build` e depois `npm start` (o servidor entrega as telas na
 
 ### Vulnerável
 - Quando a equipe chega a **1500 pontos**, fica **vulnerável**
-- Vulnerável, para pegar o lixo, precisa descer na mesa pelo menos **75 pontos em cartas da mão** na mesma jogada (o par conta; a carta do lixo não conta)
+- Vulnerável precisa **descer 75 pontos de cartas da mão na mesma jogada** para:
+  - **Pegar o lixo:** desce os 75 (o par conta; a carta do lixo não conta) e, com o par que casa com a carta do lixo, pega o lixo na mesma jogada
+  - **Bater e pegar o morto:** desce todas as cartas na mesa somando pelo menos 75 pontos naquela jogada
+- O que desceu numa vez não vale para a próxima (zera quando passa a vez)
+- A batida final (com canastra limpa) não tem essa exigência
+- Na tela: selecione o par + os jogos (ou cartas para encaixar nos seus jogos) e toque em **Pegar lixo**; o jogo mostra a soma das cartas selecionadas e divide em jogos sozinho
 
 ### Morto
 - **Dois montes de 11 cartas**, para as **duas primeiras equipes que baterem** (não são "de" ninguém)

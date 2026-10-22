@@ -320,6 +320,58 @@ describe('batidas e morto', () => {
   });
 });
 
+describe('vulnerável na batida', () => {
+  it('vulnerável não bate para pegar o morto sem descer 75 na jogada', () => {
+    const mao = cs('JP', 'QP', 'KP'); // 30 pontos
+    const e = cenario(2, (e) => {
+      e.equipes[0].pontos = 1600;
+      e.maos[0] = [...mao];
+      e.fase = 'jogar';
+    });
+    expect(() => baixarJogo(e, 0, ids(mao))).toThrow('vulnerável');
+  });
+
+  it('vulnerável bate e pega o morto descendo 75 ou mais na jogada', () => {
+    const j1 = cs('QE', 'KE', 'AE'); // 35
+    const j2 = cs('8P', '9P', '10P'); // 30
+    const j3 = cs('JO', 'QO', 'KO'); // 30
+    let e = cenario(2, (e) => {
+      e.equipes[0].pontos = 1600;
+      e.maos[0] = [...j1, ...j2, ...j3];
+      e.fase = 'jogar';
+    });
+    e = baixarJogo(e, 0, ids(j1));
+    e = baixarJogo(e, 0, ids(j2));
+    e = baixarJogo(e, 0, ids(j3)); // 95 pontos: bate e pega o morto
+    expect(e.equipes[0].pegouMorto).toBe(true);
+    expect(e.maos[0]).toHaveLength(11);
+  });
+
+  it('o que desceu numa vez não vale para a próxima', () => {
+    const j1 = cs('QE', 'KE', 'AE');
+    let e = cenario(2, (e) => {
+      e.equipes[0].pontos = 1600;
+      e.maos[0] = [...j1, ...cs('4C', '9O')];
+      e.fase = 'jogar';
+    });
+    e = baixarJogo(e, 0, ids(j1));
+    expect(e.descidoNaVez).toBe(35);
+    e = descartar(e, 0, e.maos[0][0].id);
+    expect(e.descidoNaVez).toBe(0);
+  });
+
+  it('não vulnerável bate sem exigência de pontos', () => {
+    const mao = cs('JP', 'QP', 'KP');
+    let e = cenario(2, (e) => {
+      e.equipes[0].pontos = 1000;
+      e.maos[0] = [...mao];
+      e.fase = 'jogar';
+    });
+    e = baixarJogo(e, 0, ids(mao));
+    expect(e.equipes[0].pegouMorto).toBe(true);
+  });
+});
+
 describe('mortos viram monte', () => {
   it('meu morto virou monte, mas ainda posso bater e pegar o outro', () => {
     let e = cenario(2, (e) => {

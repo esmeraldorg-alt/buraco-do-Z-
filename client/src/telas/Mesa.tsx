@@ -1,6 +1,6 @@
 // Mesa de jogo
 import { useEffect, useMemo, useState } from 'react';
-import { analisarJogo, type Carta as TCarta, type VisaoJogador } from '@buraco-do-ze/engine';
+import { analisarJogo, somaPontos, type Carta as TCarta, type VisaoJogador } from '@buraco-do-ze/engine';
 import type { Usuario } from '../api';
 import type { Resposta, VisaoSala } from '../conexao';
 import { Carta, NOME_ORDEM, VersoCarta, ordenarMao, type OrdemMao } from '../Carta';
@@ -14,15 +14,62 @@ interface Props {
 
 const NOME_CANASTRA = { limpa: 'Limpa', suja: 'Suja', asAAs: 'Ás a Ás' } as const;
 
-/** Monta a jogada de pegar o lixo a partir das cartas selecionadas: um par que casa + (opcional) um jogo extra */
-function montarJogadaLixo(topo: TCarta, selecionadas: TCarta[]) {
+type Adicao = { jogo: number; cartas: string[] };
+
+/**
+ * Divide as cartas selecionadas em jogos novos e/ou encaixes nos jogos que a equipe já tem na mesa.
+ * Usado no "Pegar lixo" do vulnerável: o par + as cartas para somar 75 pontos.
+ */
+function dividirEmJogos(cartas: TCarta[], jogosMesa: TCarta[][]): { novos: string[][]; adicoes: Adicao[] } | null {
+  const extras = new Map<number, TCarta[]>(); // cartas encaixadas em cada jogo da mesa
+
+  function resolver(resto: TCarta[], novos: TCarta[][]): TCarta[][] | null {
+    if (resto.length === 0) return novos;
+    const [c, ...outras] = resto;
+    // (a) encaixar num jogo da mesa
+    for (let i = 0; i < jogosMesa.length; i++) {
+      const ja = extras.get(i) ?? [];
+      if (analisarJogo([...jogosMesa[i], ...ja, c]).valido) {
+        extras.set(i, [...ja, c]);
+        const r = resolver(outras, novos);
+        if (r) return r;
+        extras.set(i, ja);
+      }
+    }
+    // (b) começar um jogo novo com essa carta e outras do mesmo naipe (ou um 2)
+    const candidatas = outras.filter((o) => o.naipe === c.naipe || o.valor === 2);
+    const total = 1 << candidatas.length;
+    for (let m = 1; m < total && candidatas.length <= 12; m++) {
+      const grupo = [c, ...candidatas.filter((_, k) => m & (1 << k))];
+      if (grupo.length < 3 || !analisarJogo(grupo).valido) continue;
+      const r = resolver(
+        outras.filter((o) => !grupo.includes(o)),
+        [...novos, grupo],
+      );
+      if (r) return r;
+    }
+    return null;
+  }
+
+  const novos = resolver(cartas, []);
+  if (!novos) return null;
+  return {
+    novos: novos.map((g) => g.map((x) => x.id)),
+    adicoes: [...extras.entries()].filter(([, cs]) => cs.length).map(([jogo, cs]) => ({ jogo, cartas: cs.map((x) => x.id) })),
+  };
+}
+
+/** Monta a jogada de pegar o lixo: um par que casa com a carta do lixo + (opcional) outros jogos/encaixes */
+function montarJogadaLixo(topo: TCarta, selecionadas: TCarta[], jogosMesa: TCarta[][]) {
   for (let i = 0; i < selecionadas.length; i++) {
     for (let j = i + 1; j < selecionadas.length; j++) {
       const par = [selecionadas[i], selecionadas[j]];
       if (!analisarJogo([topo, ...par]).valido) continue;
       const resto = selecionadas.filter((_, k) => k !== i && k !== j);
-      if (resto.length === 0) return { par: [par[0].id, par[1].id] as [string, string] };
-      if (analisarJogo(resto).valido) return { par: [par[0].id, par[1].id] as [string, string], novosJogos: [resto.map((c) => c.id)] };
+      const ids = [par[0].id, par[1].id] as [string, string];
+      if (resto.length === 0) return { par: ids };
+      const div = dividirEmJogos(resto, jogosMesa);
+      if (div) return { par: ids, novosJogos: div.novos, adicoes: div.adicoes };
     }
   }
   return null;
@@ -96,28 +143,47 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
     const topo = jogo.lixo.at(-1);
     if (!topo) return setErro('O lixo está vazio');
     if (selecionadas.length < 2) return setErro('Selecione as duas cartas da mão que fazem sequência com a carta do lixo');
-    const jogada = montarJogadaLixo(topo, selecionadas);
-    if (!jogada) return setErro('As cartas selecionadas não formam jogo com a carta do lixo');
+    const jogada = montarJogadaLixo(topo, selecionadas, minhaEq.jogos);
+    if (!jogada)
+      return setErro(
+        vulneravel
+          ? 'Selecione o par que casa com a carta do lixo e as cartas dos jogos que somam 75 pontos (todas precisam formar jogo)'
+          : 'As cartas selecionadas não formam jogo com a carta do lixo',
+      );
+    if (vulneravel) {
+      const pontos = somaPontos(selecionadas);
+      if (pontos < jogo.minimoVulneravel)
+        return setErro(
+          `Vulnerável: para pegar o lixo, desça pelo menos ${jogo.minimoVulneravel} pontos da mão. As cartas selecionadas somam ${pontos}.`,
+        );
+    }
     void jogar({ tipo: 'lixo', ...jogada });
   }
 
   /** Avisa antes de mandar uma jogada que deixaria a mão vazia ou com 1 carta sem poder bater */
-  function bloqueiaBatida(quantasSaem: number, descartando = false): boolean {
+  function bloqueiaBatida(quantasSaem: number, descartando = false, pontosDescendo = 0): boolean {
     const sobram = mao.length - quantasSaem;
-    if (podeBater) return false;
-    if (sobram === 0 || (!descartando && sobram === 1)) {
+    if (sobram >= 2 || (descartando && sobram === 1)) return false;
+    if (temLimpa) return false;
+    if (!minhaEq.pegouMorto && sobraMorto) {
+      // Vai pegar o morto: vulnerável precisa ter descido 75 nesta jogada
+      const total = jogo.descidoNaVez + pontosDescendo;
+      if (!vulneravel || total >= jogo.minimoVulneravel) return false;
       setErro(
-        'Ainda não dá para bater: sua equipe precisa de uma canastra limpa. Baixe deixando pelo menos 2 cartas na mão, ou descarte uma carta.',
+        `Vulnerável: para bater e pegar o morto, desça pelo menos ${jogo.minimoVulneravel} pontos nesta jogada (até agora: ${total}). Fique com pelo menos 2 cartas.`,
       );
       return true;
     }
-    return false;
+    setErro(
+      'Ainda não dá para bater: sua equipe precisa de uma canastra limpa. Baixe deixando pelo menos 2 cartas na mão, ou descarte uma carta.',
+    );
+    return true;
   }
 
   function tocarJogo(indice: number) {
     if (!minhaVez || jogo.fase !== 'jogar') return;
     if (sel.length === 0) return setErro('Selecione cartas da mão para colocar nesse jogo');
-    if (bloqueiaBatida(sel.length)) return;
+    if (bloqueiaBatida(sel.length, false, somaPontos(selecionadas))) return;
     void jogar({ tipo: 'adicionar', jogo: indice, cartas: sel });
   }
 
@@ -131,12 +197,19 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
   });
   // Os mortos são de quem bater primeiro: se ainda tem algum na mesa e a equipe não pegou, pode bater
   const sobraMorto = jogo.mortoDisponivel.some(Boolean);
-  const podeBater = (!minhaEq.pegouMorto && sobraMorto) || temLimpa;
+  const vulneravel = minhaEq.vulneravel;
+  const faltaVulneravel = vulneravel && jogo.descidoNaVez < jogo.minimoVulneravel;
+  const podeBater = (!minhaEq.pegouMorto && sobraMorto && !faltaVulneravel) || temLimpa;
 
   let dica: string;
   if (jogo.fase === 'fimRodada' || jogo.fase === 'fimPartida') dica = 'Rodada encerrada';
   else if (!minhaVez) dica = `Vez de ${nomeJogador(jogo.vez)}`;
-  else if (jogo.fase === 'comprar') dica = 'Sua vez: compre do monte, ou selecione o par e pegue o lixo';
+  else if (jogo.fase === 'comprar')
+    dica = vulneravel
+      ? `Vulnerável: para pegar o lixo, selecione o par + jogos que somem ${jogo.minimoVulneravel} pontos e toque em "Pegar lixo". Ou compre do monte.`
+      : 'Sua vez: compre do monte, ou selecione o par e pegue o lixo';
+  else if (!minhaEq.pegouMorto && sobraMorto && faltaVulneravel && mao.length <= 6)
+    dica = `Vulnerável: para bater e pegar o morto, desça ${jogo.minimoVulneravel} pontos nesta jogada (já desceu ${jogo.descidoNaVez}).`;
   else if (!podeBater && mao.length <= 5)
     dica = minhaEq.pegouMorto
       ? 'Para bater (zerar a mão) sua equipe precisa de uma canastra LIMPA. Fique com pelo menos 2 cartas e descarte uma.'
@@ -253,7 +326,10 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
       <div className={`dica ${minhaVez ? 'minha-vez' : ''}`}>{dica}</div>
 
       <div className="mao-topo">
-        <span className="sutil">Sua mão · {mao.length} cartas</span>
+        <span className="sutil">
+          Sua mão · {mao.length} cartas
+          {selecionadas.length > 0 && <strong className="pontos-sel"> · selecionadas: {somaPontos(selecionadas)} pts</strong>}
+        </span>
         <button className="link link-ordem" onClick={trocarOrdem} title="Mudar a ordem das cartas">
           ↕ {NOME_ORDEM[ordem]}
         </button>
@@ -280,7 +356,7 @@ export function Mesa({ sala, usuario, emitir, aoMenu }: Props) {
           <>
             <button
               className="botao"
-              onClick={() => !bloqueiaBatida(sel.length) && jogar({ tipo: 'baixar', cartas: sel })}
+              onClick={() => !bloqueiaBatida(sel.length, false, somaPontos(selecionadas)) && jogar({ tipo: 'baixar', cartas: sel })}
               disabled={ocupado || sel.length < 3}
             >
               Baixar jogo

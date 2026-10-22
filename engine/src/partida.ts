@@ -61,6 +61,8 @@ export interface Estado {
    * null = já foi pego ou virou monte.
    */
   mortos: (Carta[] | null)[];
+  /** Pontos de cartas da mão que o jogador da vez já desceu na mesa nesta jogada (regra do vulnerável) */
+  descidoNaVez?: number;
   /** O que aconteceu com cada morto: null = na mesa; 'monte' = virou monte; número = equipe que pegou */
   destinoMortos?: (null | 'monte' | number)[];
   equipes: Equipe[];
@@ -120,6 +122,7 @@ function distribuir(estado: Estado): void {
   for (let j = 0; j < estado.numJogadores; j++) estado.maos.push(baralho.splice(0, cartasPorJogador));
   estado.mortos = [baralho.splice(0, cartasPorMorto), baralho.splice(0, cartasPorMorto)];
   estado.destinoMortos = [null, null];
+  estado.descidoNaVez = 0;
   estado.lixo = [];
   estado.monte = baralho;
   estado.equipes.forEach((e) => {
@@ -200,6 +203,12 @@ function verificarBatida(estado: Estado, jogador: number): 'nada' | 'morto' | 'f
     if (estado.config.exigeCanastraParaMorto && !temCanastra(equipe.jogos)) {
       throw new ErroJogada('Para bater e pegar o morto, sua equipe precisa ter uma canastra');
     }
+    const minimo = estado.config.minimoVulneravel;
+    if (estaVulneravel(estado, eq) && (estado.descidoNaVez ?? 0) < minimo) {
+      throw new ErroJogada(
+        `Sua equipe está vulnerável: para bater e pegar o morto precisa descer pelo menos ${minimo} pontos nesta jogada (você desceu ${estado.descidoNaVez ?? 0})`,
+      );
+    }
     estado.maos[jogador] = estado.mortos[i]!;
     estado.mortos[i] = null;
     estado.destinoMortos ??= [null, null];
@@ -224,6 +233,7 @@ export function podeBater(estado: Estado, jogador: number): boolean {
   const eq = equipeDe(jogador);
   const equipe = estado.equipes[eq];
   if (mortoParaPegar(estado, eq) >= 0) {
+    if (estaVulneravel(estado, eq) && (estado.descidoNaVez ?? 0) < estado.config.minimoVulneravel) return false;
     return !estado.config.exigeCanastraParaMorto || temCanastra(equipe.jogos);
   }
   return temCanastraLimpa(equipe.jogos);
@@ -243,6 +253,7 @@ function garantirCartaParaDescarte(estado: Estado, jogador: number): void {
 }
 
 function proximaVez(estado: Estado): void {
+  estado.descidoNaVez = 0;
   estado.vez = (estado.vez + 1) % estado.numJogadores;
   estado.fase = 'comprar';
 }
@@ -298,11 +309,12 @@ export function pegarLixo(estadoAtual: Estado, jogador: number, jogada: JogadaLi
   const extrasNovos = (jogada.novosJogos ?? []).map((ids) => tirarDaMao(mao, ids));
   const extrasAdicoes = (jogada.adicoes ?? []).map((a) => ({ jogo: a.jogo, cartas: tirarDaMao(mao, a.cartas) }));
 
+  const pontos =
+    somaPontos(par) +
+    extrasNovos.reduce((s, cs) => s + somaPontos(cs), 0) +
+    extrasAdicoes.reduce((s, a) => s + somaPontos(a.cartas), 0);
+  estado.descidoNaVez = (estado.descidoNaVez ?? 0) + pontos;
   if (estaVulneravel(estado, eq)) {
-    const pontos =
-      somaPontos(par) +
-      extrasNovos.reduce((s, cs) => s + somaPontos(cs), 0) +
-      extrasAdicoes.reduce((s, a) => s + somaPontos(a.cartas), 0);
     if (pontos < estado.config.minimoVulneravel) {
       throw new ErroJogada(
         `Sua equipe está vulnerável: precisa descer pelo menos ${estado.config.minimoVulneravel} pontos da mão para pegar o lixo (você desceria ${pontos})`,
@@ -329,6 +341,7 @@ export function baixarJogo(estadoAtual: Estado, jogador: number, ids: string[]):
   conferirVez(estado, jogador, 'jogar');
   const cartas = tirarDaMao(estado.maos[jogador], ids);
   estado.equipes[equipeDe(jogador)].jogos.push(validarNovoJogo(cartas));
+  estado.descidoNaVez = (estado.descidoNaVez ?? 0) + somaPontos(cartas);
   verificarBatida(estado, jogador);
   garantirCartaParaDescarte(estado, jogador);
   return estado;
@@ -340,6 +353,7 @@ export function adicionarAoJogo(estadoAtual: Estado, jogador: number, indiceJogo
   conferirVez(estado, jogador, 'jogar');
   const cartas = tirarDaMao(estado.maos[jogador], ids);
   aplicarAdicao(estado, equipeDe(jogador), indiceJogo, cartas);
+  estado.descidoNaVez = (estado.descidoNaVez ?? 0) + somaPontos(cartas);
   verificarBatida(estado, jogador);
   garantirCartaParaDescarte(estado, jogador);
   return estado;
@@ -393,6 +407,9 @@ export interface VisaoJogador {
   mortoDisponivel: boolean[];
   /** null = na mesa; 'monte' = virou monte; número = equipe que pegou */
   destinoMortos: (null | 'monte' | number)[];
+  /** Pontos que o jogador da vez já desceu nesta jogada */
+  descidoNaVez: number;
+  minimoVulneravel: number;
   equipes: {
     pontos: number;
     jogos: Carta[][];
@@ -419,6 +436,8 @@ export function visaoDoJogador(estado: Estado, jogador: number): VisaoJogador {
     cartasNoMonte: estado.monte.length,
     mortoDisponivel: estado.mortos.map((m) => m !== null),
     destinoMortos: estado.destinoMortos ?? estado.mortos.map((m) => (m ? null : 'monte')),
+    descidoNaVez: estado.descidoNaVez ?? 0,
+    minimoVulneravel: estado.config.minimoVulneravel,
     equipes: estado.equipes.map((e, i) => {
       // Depois que a rodada fecha, os pontos já foram somados ao total — não conta duas vezes
       const emJogo = estado.fase === 'comprar' || estado.fase === 'jogar';
